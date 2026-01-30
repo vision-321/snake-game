@@ -1018,14 +1018,52 @@
 
         // ==================== 事件监听 ====================
 
-        // 触摸滑动控制
+        // 触摸滑动控制（优化：使用 touchmove 实时检测，提高响应速度）
         let touchStartX = 0;
         let touchStartY = 0;
-        const MIN_SWIPE_DISTANCE = 30;
+        let touchHandled = false;  // 标记本次触摸是否已处理方向
+        const MIN_SWIPE_DISTANCE = 20;  // 降低阈值，更快响应
 
         canvas.addEventListener('touchstart', (e) => {
             touchStartX = e.touches[0].clientX;
             touchStartY = e.touches[0].clientY;
+            touchHandled = false;  // 重置标记
+            e.preventDefault();
+        }, { passive: false });
+
+        // 使用 touchmove 实时检测方向变化，不需要等待手指抬起
+        canvas.addEventListener('touchmove', (e) => {
+            if (gameState !== 'playing' || touchHandled) return;
+
+            const touchX = e.touches[0].clientX;
+            const touchY = e.touches[0].clientY;
+            const deltaX = touchX - touchStartX;
+            const deltaY = touchY - touchStartY;
+
+            // 达到最小滑动距离才触发
+            if (Math.abs(deltaX) < MIN_SWIPE_DISTANCE && Math.abs(deltaY) < MIN_SWIPE_DISTANCE) {
+                return;
+            }
+
+            const opposites = { up: 'down', down: 'up', left: 'right', right: 'left' };
+            let newDir;
+
+            if (Math.abs(deltaX) > Math.abs(deltaY)) {
+                newDir = deltaX > 0 ? 'right' : 'left';
+            } else {
+                newDir = deltaY > 0 ? 'down' : 'up';
+            }
+
+            if (opposites[newDir] !== direction) {
+                nextDirection = newDir;
+                touchHandled = true;  // 标记已处理，避免连续触发
+                // 更新起点，允许连续滑动改变方向
+                touchStartX = touchX;
+                touchStartY = touchY;
+                // 短暂延迟后重置，允许继续滑动
+                setTimeout(() => { touchHandled = false; }, 100);
+            }
+
             e.preventDefault();
         }, { passive: false });
 
@@ -1040,31 +1078,16 @@
                 return;
             }
 
-            const touchEndX = e.changedTouches[0].clientX;
-            const touchEndY = e.changedTouches[0].clientY;
-            const deltaX = touchEndX - touchStartX;
-            const deltaY = touchEndY - touchStartY;
+            // 如果没有处理过滑动，则视为点击暂停
+            if (!touchHandled) {
+                const touchEndX = e.changedTouches[0].clientX;
+                const touchEndY = e.changedTouches[0].clientY;
+                const deltaX = touchEndX - touchStartX;
+                const deltaY = touchEndY - touchStartY;
 
-            // 判断滑动方向
-            if (Math.abs(deltaX) < MIN_SWIPE_DISTANCE && Math.abs(deltaY) < MIN_SWIPE_DISTANCE) {
-                // 点击暂停
-                togglePause();
-                return;
-            }
-
-            const opposites = { up: 'down', down: 'up', left: 'right', right: 'left' };
-            let newDir;
-
-            if (Math.abs(deltaX) > Math.abs(deltaY)) {
-                // 水平滑动
-                newDir = deltaX > 0 ? 'right' : 'left';
-            } else {
-                // 垂直滑动
-                newDir = deltaY > 0 ? 'down' : 'up';
-            }
-
-            if (opposites[newDir] !== direction) {
-                nextDirection = newDir;
+                if (Math.abs(deltaX) < MIN_SWIPE_DISTANCE && Math.abs(deltaY) < MIN_SWIPE_DISTANCE) {
+                    togglePause();
+                }
             }
         }, { passive: false });
 
