@@ -164,6 +164,19 @@
             margin: 20px 0;
         }
 
+        .overlay .mobile-hint {
+            display: none;
+        }
+
+        @media (max-width: 768px) {
+            .overlay .desktop-hint {
+                display: none;
+            }
+            .overlay .mobile-hint {
+                display: block;
+            }
+        }
+
         /* 底部控制区 */
         .bottom-controls {
             display: flex;
@@ -238,6 +251,136 @@
             border-radius: 4px;
             margin: 0 2px;
         }
+
+        /* 虚拟方向键 */
+        .virtual-controls {
+            display: none;
+            flex-direction: column;
+            align-items: center;
+            gap: 5px;
+            margin-top: 10px;
+        }
+
+        .virtual-controls .row {
+            display: flex;
+            gap: 5px;
+        }
+
+        .virtual-btn {
+            width: 60px;
+            height: 60px;
+            border: 2px solid rgba(255, 255, 255, 0.4);
+            border-radius: 12px;
+            background: rgba(255, 255, 255, 0.15);
+            color: white;
+            font-size: 1.5rem;
+            cursor: pointer;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            user-select: none;
+            -webkit-user-select: none;
+            touch-action: manipulation;
+            transition: all 0.15s ease;
+        }
+
+        .virtual-btn:active {
+            background: rgba(255, 255, 255, 0.35);
+            transform: scale(0.95);
+        }
+
+        .virtual-btn.placeholder {
+            visibility: hidden;
+        }
+
+        /* 移动端响应式布局 */
+        @media (max-width: 768px) {
+            body {
+                padding: 10px;
+            }
+
+            .main-container {
+                gap: 15px;
+            }
+
+            .score-header {
+                gap: 20px;
+                flex-wrap: wrap;
+                justify-content: center;
+            }
+
+            .score-item .value {
+                font-size: 1.5rem;
+            }
+
+            .game-area {
+                flex-direction: column;
+                gap: 15px;
+            }
+
+            .sidebar {
+                flex-direction: row;
+                flex-wrap: wrap;
+                justify-content: center;
+                min-width: auto;
+            }
+
+            .sidebar-title {
+                width: 100%;
+            }
+
+            .sidebar-btn {
+                padding: 8px 12px;
+                font-size: 0.8rem;
+            }
+
+            #gameCanvas {
+                max-width: 100%;
+                height: auto;
+            }
+
+            .bottom-controls {
+                flex-wrap: wrap;
+                justify-content: center;
+            }
+
+            .control-btn {
+                padding: 8px 15px;
+                font-size: 0.85rem;
+            }
+
+            .instructions {
+                display: none;
+            }
+
+            .virtual-controls {
+                display: flex;
+            }
+
+            .overlay h2 {
+                font-size: 1.5rem;
+            }
+
+            .overlay p {
+                font-size: 0.95rem;
+            }
+
+            .overlay .final-score {
+                font-size: 2.5rem;
+            }
+        }
+
+        @media (max-width: 520px) {
+            #gameCanvas {
+                width: 100%;
+                max-width: 350px;
+            }
+
+            .virtual-btn {
+                width: 55px;
+                height: 55px;
+            }
+        }
     </style>
 </head>
 <body>
@@ -274,16 +417,19 @@
                 <canvas id="gameCanvas" width="500" height="500"></canvas>
                 <div class="overlay" id="startOverlay">
                     <h2>🐍 贪吃蛇</h2>
-                    <p>按 <kbd>空格</kbd> 开始游戏</p>
+                    <p class="desktop-hint">按 <kbd>空格</kbd> 开始游戏</p>
+                    <p class="mobile-hint">点击屏幕开始游戏</p>
                 </div>
                 <div class="overlay hidden" id="pauseOverlay">
                     <h2>⏸️ 暂停</h2>
-                    <p>按 <kbd>空格</kbd> 继续</p>
+                    <p class="desktop-hint">按 <kbd>空格</kbd> 继续</p>
+                    <p class="mobile-hint">点击屏幕继续</p>
                 </div>
                 <div class="overlay hidden" id="gameOverOverlay">
                     <h2>💀 游戏结束</h2>
                     <div class="final-score" id="finalScore">0</div>
-                    <p>按 <kbd>空格</kbd> 或 <kbd>R</kbd> 重新开始</p>
+                    <p class="desktop-hint">按 <kbd>空格</kbd> 或 <kbd>R</kbd> 重新开始</p>
+                    <p class="mobile-hint">点击屏幕重新开始</p>
                 </div>
             </div>
 
@@ -315,6 +461,20 @@
         <div class="instructions">
             <kbd>↑</kbd><kbd>↓</kbd><kbd>←</kbd><kbd>→</kbd> 或 <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> 移动 ｜
             <kbd>空格</kbd> 开始/暂停 ｜ <kbd>R</kbd> 重新开始 ｜ <kbd>M</kbd> 音乐开关
+        </div>
+
+        <!-- 虚拟方向键（移动端显示） -->
+        <div class="virtual-controls" id="virtualControls">
+            <div class="row">
+                <button class="virtual-btn placeholder"></button>
+                <button class="virtual-btn" data-direction="up">↑</button>
+                <button class="virtual-btn placeholder"></button>
+            </div>
+            <div class="row">
+                <button class="virtual-btn" data-direction="left">←</button>
+                <button class="virtual-btn" data-direction="down">↓</button>
+                <button class="virtual-btn" data-direction="right">→</button>
+            </div>
         </div>
     </div>
 
@@ -857,6 +1017,99 @@
         }
 
         // ==================== 事件监听 ====================
+
+        // 触摸滑动控制
+        let touchStartX = 0;
+        let touchStartY = 0;
+        const MIN_SWIPE_DISTANCE = 30;
+
+        canvas.addEventListener('touchstart', (e) => {
+            touchStartX = e.touches[0].clientX;
+            touchStartY = e.touches[0].clientY;
+            e.preventDefault();
+        }, { passive: false });
+
+        canvas.addEventListener('touchend', (e) => {
+            if (gameState !== 'playing') {
+                // 点击画布开始/暂停游戏
+                if (gameState === 'waiting' || gameState === 'over') {
+                    startGame();
+                } else if (gameState === 'paused') {
+                    togglePause();
+                }
+                return;
+            }
+
+            const touchEndX = e.changedTouches[0].clientX;
+            const touchEndY = e.changedTouches[0].clientY;
+            const deltaX = touchEndX - touchStartX;
+            const deltaY = touchEndY - touchStartY;
+
+            // 判断滑动方向
+            if (Math.abs(deltaX) < MIN_SWIPE_DISTANCE && Math.abs(deltaY) < MIN_SWIPE_DISTANCE) {
+                // 点击暂停
+                togglePause();
+                return;
+            }
+
+            const opposites = { up: 'down', down: 'up', left: 'right', right: 'left' };
+            let newDir;
+
+            if (Math.abs(deltaX) > Math.abs(deltaY)) {
+                // 水平滑动
+                newDir = deltaX > 0 ? 'right' : 'left';
+            } else {
+                // 垂直滑动
+                newDir = deltaY > 0 ? 'down' : 'up';
+            }
+
+            if (opposites[newDir] !== direction) {
+                nextDirection = newDir;
+            }
+        }, { passive: false });
+
+        // 虚拟方向键控制
+        const virtualBtns = document.querySelectorAll('.virtual-btn[data-direction]');
+        virtualBtns.forEach(btn => {
+            btn.addEventListener('touchstart', (e) => {
+                e.preventDefault();
+                initAudio();
+
+                if (gameState !== 'playing') {
+                    if (gameState === 'waiting' || gameState === 'over') {
+                        startGame();
+                    }
+                    return;
+                }
+
+                const newDir = btn.dataset.direction;
+                const opposites = { up: 'down', down: 'up', left: 'right', right: 'left' };
+
+                if (opposites[newDir] !== direction) {
+                    nextDirection = newDir;
+                }
+            }, { passive: false });
+
+            // 同时支持鼠标点击（方便测试）
+            btn.addEventListener('click', () => {
+                initAudio();
+
+                if (gameState !== 'playing') {
+                    if (gameState === 'waiting' || gameState === 'over') {
+                        startGame();
+                    }
+                    return;
+                }
+
+                const newDir = btn.dataset.direction;
+                const opposites = { up: 'down', down: 'up', left: 'right', right: 'left' };
+
+                if (opposites[newDir] !== direction) {
+                    nextDirection = newDir;
+                }
+            });
+        });
+
         document.addEventListener('keydown', (e) => {
             const keyMap = {
                 'ArrowUp': 'up', 'KeyW': 'up',
