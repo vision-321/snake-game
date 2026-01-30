@@ -1,0 +1,1114 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>贪吃蛇 V2 - 角色版</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', 'Microsoft YaHei', sans-serif;
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+            padding: 20px;
+        }
+
+        .main-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 20px;
+        }
+
+        /* 顶部分数区域 */
+        .score-header {
+            display: flex;
+            gap: 50px;
+            align-items: center;
+        }
+
+        .score-item {
+            color: rgba(255, 255, 255, 0.9);
+            font-size: 1.2rem;
+            text-align: center;
+        }
+
+        .score-item .label {
+            font-size: 0.9rem;
+            opacity: 0.7;
+            margin-bottom: 5px;
+        }
+
+        .score-item .value {
+            font-weight: bold;
+            font-size: 2rem;
+        }
+
+        .difficulty-badge {
+            display: inline-block;
+            padding: 6px 16px;
+            border-radius: 20px;
+            font-size: 0.9rem;
+            font-weight: bold;
+        }
+
+        .difficulty-easy { background: #4CAF50; color: white; }
+        .difficulty-normal { background: #2196F3; color: white; }
+        .difficulty-hard { background: #FF9800; color: white; }
+        .difficulty-hell { background: #F44336; color: white; }
+
+        /* 游戏主体区域 */
+        .game-area {
+            display: flex;
+            align-items: center;
+            gap: 30px;
+        }
+
+        /* 侧边栏通用样式 */
+        .sidebar {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            min-width: 100px;
+        }
+
+        .sidebar-title {
+            color: rgba(255, 255, 255, 0.7);
+            font-size: 0.85rem;
+            text-align: center;
+            margin-bottom: 5px;
+        }
+
+        .sidebar-btn {
+            padding: 10px 16px;
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            border-radius: 10px;
+            background: rgba(255, 255, 255, 0.08);
+            color: rgba(255, 255, 255, 0.8);
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-size: 0.9rem;
+            text-align: center;
+        }
+
+        .sidebar-btn:hover {
+            background: rgba(255, 255, 255, 0.15);
+            border-color: rgba(255, 255, 255, 0.5);
+            color: white;
+        }
+
+        .sidebar-btn.active {
+            background: rgba(255, 255, 255, 0.25);
+            border-color: white;
+            color: white;
+        }
+
+        /* 角色选择按钮 */
+        .character-btn {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 8px;
+            padding: 12px;
+            border: 3px solid rgba(255, 255, 255, 0.3);
+            border-radius: 12px;
+            background: rgba(255, 255, 255, 0.08);
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .character-btn:hover {
+            background: rgba(255, 255, 255, 0.15);
+            border-color: rgba(255, 255, 255, 0.5);
+            transform: scale(1.05);
+        }
+
+        .character-btn.active {
+            background: rgba(255, 255, 255, 0.25);
+            border-color: #FFD700;
+            box-shadow: 0 0 15px rgba(255, 215, 0, 0.5);
+        }
+
+        .character-btn img {
+            width: 60px;
+            height: 60px;
+            border-radius: 50%;
+            object-fit: cover;
+            border: 2px solid rgba(255, 255, 255, 0.5);
+        }
+
+        .character-btn .name {
+            color: rgba(255, 255, 255, 0.9);
+            font-size: 0.85rem;
+            font-weight: bold;
+        }
+
+        /* 游戏画布 */
+        .game-wrapper {
+            position: relative;
+            display: inline-block;
+        }
+
+        #gameCanvas {
+            border-radius: 12px;
+            box-shadow: 0 0 30px rgba(0, 0, 0, 0.5), 0 0 60px rgba(0, 0, 0, 0.3);
+            background: #1a1a2e;
+        }
+
+        .overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            background: rgba(0, 0, 0, 0.7);
+            border-radius: 12px;
+            opacity: 1;
+            transition: opacity 0.3s ease;
+        }
+
+        .overlay.hidden {
+            opacity: 0;
+            pointer-events: none;
+        }
+
+        .overlay h2 {
+            color: white;
+            font-size: 2rem;
+            margin-bottom: 15px;
+            text-shadow: 0 0 20px rgba(255, 255, 255, 0.5);
+        }
+
+        .overlay p {
+            color: rgba(255, 255, 255, 0.8);
+            font-size: 1.1rem;
+            margin-bottom: 10px;
+        }
+
+        .overlay .final-score {
+            font-size: 3rem;
+            font-weight: bold;
+            color: #FFD700;
+            text-shadow: 0 0 30px rgba(255, 215, 0, 0.7);
+            margin: 20px 0;
+        }
+
+        .overlay .mobile-hint {
+            display: none;
+        }
+
+        @media (max-width: 768px) {
+            .overlay .desktop-hint {
+                display: none;
+            }
+            .overlay .mobile-hint {
+                display: block;
+            }
+        }
+
+        /* 底部控制区 */
+        .bottom-controls {
+            display: flex;
+            gap: 15px;
+            align-items: center;
+        }
+
+        .control-btn {
+            padding: 10px 20px;
+            border: 2px solid rgba(255, 255, 255, 0.4);
+            border-radius: 25px;
+            background: rgba(255, 255, 255, 0.1);
+            color: white;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-size: 0.95rem;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .control-btn:hover {
+            background: rgba(255, 255, 255, 0.2);
+            border-color: rgba(255, 255, 255, 0.6);
+            transform: translateY(-2px);
+        }
+
+        .control-btn.active {
+            background: rgba(255, 255, 255, 0.3);
+            border-color: white;
+        }
+
+        /* 操作说明 */
+        .instructions {
+            color: rgba(255, 255, 255, 0.5);
+            font-size: 0.85rem;
+            text-align: center;
+        }
+
+        .instructions kbd {
+            padding: 3px 8px;
+            background: rgba(255, 255, 255, 0.12);
+            border-radius: 4px;
+            margin: 0 2px;
+        }
+
+        /* 虚拟方向键 */
+        .virtual-controls {
+            display: none;
+            flex-direction: column;
+            align-items: center;
+            gap: 5px;
+            margin-top: 10px;
+        }
+
+        .virtual-controls .row {
+            display: flex;
+            gap: 5px;
+        }
+
+        .virtual-btn {
+            width: 60px;
+            height: 60px;
+            border: 2px solid rgba(255, 255, 255, 0.4);
+            border-radius: 12px;
+            background: rgba(255, 255, 255, 0.15);
+            color: white;
+            font-size: 1.5rem;
+            cursor: pointer;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            user-select: none;
+            -webkit-user-select: none;
+            touch-action: manipulation;
+            transition: all 0.15s ease;
+        }
+
+        .virtual-btn:active {
+            background: rgba(255, 255, 255, 0.35);
+            transform: scale(0.95);
+        }
+
+        .virtual-btn.placeholder {
+            visibility: hidden;
+        }
+
+        /* 移动端响应式布局 */
+        @media (max-width: 768px) {
+            body {
+                padding: 10px;
+            }
+
+            .main-container {
+                gap: 15px;
+            }
+
+            .score-header {
+                gap: 20px;
+                flex-wrap: wrap;
+                justify-content: center;
+            }
+
+            .score-item .value {
+                font-size: 1.5rem;
+            }
+
+            .game-area {
+                flex-direction: column;
+                gap: 15px;
+            }
+
+            .sidebar {
+                flex-direction: row;
+                flex-wrap: wrap;
+                justify-content: center;
+                min-width: auto;
+            }
+
+            .sidebar-title {
+                width: 100%;
+            }
+
+            .sidebar-btn {
+                padding: 8px 12px;
+                font-size: 0.8rem;
+            }
+
+            .character-btn {
+                padding: 8px;
+            }
+
+            .character-btn img {
+                width: 45px;
+                height: 45px;
+            }
+
+            .character-btn .name {
+                font-size: 0.75rem;
+            }
+
+            #gameCanvas {
+                max-width: 100%;
+                height: auto;
+            }
+
+            .bottom-controls {
+                flex-wrap: wrap;
+                justify-content: center;
+            }
+
+            .control-btn {
+                padding: 8px 15px;
+                font-size: 0.85rem;
+            }
+
+            .instructions {
+                display: none;
+            }
+
+            .virtual-controls {
+                display: flex;
+            }
+
+            .overlay h2 {
+                font-size: 1.5rem;
+            }
+
+            .overlay p {
+                font-size: 0.95rem;
+            }
+
+            .overlay .final-score {
+                font-size: 2.5rem;
+            }
+        }
+
+        @media (max-width: 520px) {
+            #gameCanvas {
+                width: 100%;
+                max-width: 350px;
+            }
+
+            .virtual-btn {
+                width: 55px;
+                height: 55px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="main-container">
+        <!-- 顶部分数区域 -->
+        <div class="score-header">
+            <div class="score-item">
+                <div class="label">当前分数</div>
+                <div class="value" id="score">0</div>
+            </div>
+            <div class="score-item">
+                <div class="label">难度</div>
+                <div id="difficultyBadge" class="difficulty-badge difficulty-normal">普通</div>
+            </div>
+            <div class="score-item">
+                <div class="label">最高分</div>
+                <div class="value" id="highScore">0</div>
+            </div>
+        </div>
+
+        <!-- 游戏主体区域 -->
+        <div class="game-area">
+            <!-- 左侧：难度选择 -->
+            <div class="sidebar">
+                <div class="sidebar-title">难度选择</div>
+                <button class="sidebar-btn" data-difficulty="easy">🟢 简单</button>
+                <button class="sidebar-btn active" data-difficulty="normal">🔵 普通</button>
+                <button class="sidebar-btn" data-difficulty="hard">🟠 困难</button>
+                <button class="sidebar-btn" data-difficulty="hell">🔴 地狱</button>
+            </div>
+
+            <!-- 游戏画布 -->
+            <div class="game-wrapper">
+                <canvas id="gameCanvas" width="500" height="500"></canvas>
+                <div class="overlay" id="startOverlay">
+                    <h2>🐍 贪吃蛇 V2</h2>
+                    <p>角色版 - 选择你的角色开始游戏</p>
+                    <p class="desktop-hint">按 <kbd>空格</kbd> 开始游戏</p>
+                    <p class="mobile-hint">点击屏幕开始游戏</p>
+                </div>
+                <div class="overlay hidden" id="pauseOverlay">
+                    <h2>⏸️ 暂停</h2>
+                    <p class="desktop-hint">按 <kbd>空格</kbd> 继续</p>
+                    <p class="mobile-hint">点击屏幕继续</p>
+                </div>
+                <div class="overlay hidden" id="gameOverOverlay">
+                    <h2>💀 游戏结束</h2>
+                    <div class="final-score" id="finalScore">0</div>
+                    <p class="desktop-hint">按 <kbd>空格</kbd> 或 <kbd>R</kbd> 重新开始</p>
+                    <p class="mobile-hint">点击屏幕重新开始</p>
+                </div>
+            </div>
+
+            <!-- 右侧：角色选择 -->
+            <div class="sidebar">
+                <div class="sidebar-title">选择角色</div>
+                <button class="character-btn active" data-character="rx">
+                    <img src="images/rx.jpg" alt="RX">
+                    <span class="name">RX</span>
+                </button>
+                <button class="character-btn" data-character="xm">
+                    <img src="images/xm.jpg" alt="XM">
+                    <span class="name">XM</span>
+                </button>
+                <button class="character-btn" data-character="xz">
+                    <img src="images/xz.jpg" alt="XZ">
+                    <span class="name">XZ</span>
+                </button>
+            </div>
+        </div>
+
+        <!-- 底部控制区 -->
+        <div class="bottom-controls">
+            <button class="control-btn active" id="soundBtn">🔊 音效</button>
+        </div>
+
+        <!-- 操作说明 -->
+        <div class="instructions">
+            <kbd>↑</kbd><kbd>↓</kbd><kbd>←</kbd><kbd>→</kbd> 或 <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> 移动 ｜
+            <kbd>空格</kbd> 开始/暂停 ｜ <kbd>R</kbd> 重新开始
+        </div>
+
+        <!-- 虚拟方向键（移动端显示） -->
+        <div class="virtual-controls" id="virtualControls">
+            <div class="row">
+                <button class="virtual-btn placeholder"></button>
+                <button class="virtual-btn" data-direction="up">↑</button>
+                <button class="virtual-btn placeholder"></button>
+            </div>
+            <div class="row">
+                <button class="virtual-btn" data-direction="left">←</button>
+                <button class="virtual-btn" data-direction="down">↓</button>
+                <button class="virtual-btn" data-direction="right">→</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // ==================== 游戏配置 ====================
+        const GRID_SIZE = 20;
+        const CANVAS_SIZE = 500;
+        const CELL_COUNT = CANVAS_SIZE / GRID_SIZE;
+
+        // 难度配置
+        const difficulties = {
+            easy:   { name: '简单', baseSpeed: 200, minSpeed: 100, speedStep: 5,  scorePerFood: 5,  class: 'difficulty-easy' },
+            normal: { name: '普通', baseSpeed: 150, minSpeed: 70,  speedStep: 10, scorePerFood: 10, class: 'difficulty-normal' },
+            hard:   { name: '困难', baseSpeed: 100, minSpeed: 50,  speedStep: 15, scorePerFood: 15, class: 'difficulty-hard' },
+            hell:   { name: '地狱', baseSpeed: 70,  minSpeed: 30,  speedStep: 20, scorePerFood: 20, class: 'difficulty-hell' }
+        };
+
+        // 角色配置
+        const characters = {
+            rx: { name: 'RX', image: 'images/rx.jpg', color: '#FF6B6B' },
+            xm: { name: 'XM', image: 'images/xm.jpg', color: '#4ECDC4' },
+            xz: { name: 'XZ', image: 'images/xz.jpg', color: '#FFE66D' }
+        };
+
+        // ==================== 游戏状态 ====================
+        let snake = [];
+        let direction = 'right';
+        let nextDirection = 'right';
+        let food = { x: 0, y: 0, character: 'xm' };
+        let score = 0;
+        let highScore = parseInt(localStorage.getItem('snakeV2HighScore')) || 0;
+        let gameState = 'waiting';
+        let speed = 150;
+        let gameLoop = null;
+        let currentCharacter = localStorage.getItem('snakeV2Character') || 'rx';
+        let currentDifficulty = localStorage.getItem('snakeV2Difficulty') || 'normal';
+        let soundEnabled = localStorage.getItem('snakeV2Sound') !== 'false';
+
+        // 预加载图片
+        const characterImages = {};
+        let imagesLoaded = 0;
+
+        function preloadImages() {
+            Object.keys(characters).forEach(key => {
+                const img = new Image();
+                img.onload = () => {
+                    imagesLoaded++;
+                    if (imagesLoaded === Object.keys(characters).length) {
+                        render();
+                    }
+                };
+                img.src = characters[key].image;
+                characterImages[key] = img;
+            });
+        }
+
+        // ==================== DOM 元素 ====================
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const scoreEl = document.getElementById('score');
+        const highScoreEl = document.getElementById('highScore');
+        const finalScoreEl = document.getElementById('finalScore');
+        const startOverlay = document.getElementById('startOverlay');
+        const pauseOverlay = document.getElementById('pauseOverlay');
+        const gameOverOverlay = document.getElementById('gameOverOverlay');
+        const soundBtn = document.getElementById('soundBtn');
+        const difficultyBadge = document.getElementById('difficultyBadge');
+        const difficultyBtns = document.querySelectorAll('[data-difficulty]');
+        const characterBtns = document.querySelectorAll('[data-character]');
+
+        // ==================== 音效系统 ====================
+        let audioCtx = null;
+
+        function initAudio() {
+            if (!audioCtx) {
+                audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            }
+        }
+
+        function playEatSound() {
+            if (!soundEnabled || !audioCtx) return;
+
+            const oscillator = audioCtx.createOscillator();
+            const gainNode = audioCtx.createGain();
+
+            oscillator.connect(gainNode);
+            gainNode.connect(audioCtx.destination);
+
+            oscillator.frequency.setValueAtTime(587.33, audioCtx.currentTime);
+            oscillator.frequency.setValueAtTime(880, audioCtx.currentTime + 0.1);
+
+            gainNode.gain.setValueAtTime(0.3, audioCtx.currentTime);
+            gainNode.gain.linearRampToValueAtTime(0.01, audioCtx.currentTime + 0.15);
+
+            oscillator.start(audioCtx.currentTime);
+            oscillator.stop(audioCtx.currentTime + 0.15);
+        }
+
+        function playGameOverSound() {
+            if (!soundEnabled || !audioCtx) return;
+
+            const oscillator = audioCtx.createOscillator();
+            const gainNode = audioCtx.createGain();
+
+            oscillator.connect(gainNode);
+            gainNode.connect(audioCtx.destination);
+
+            oscillator.frequency.setValueAtTime(392, audioCtx.currentTime);
+            oscillator.frequency.setValueAtTime(349.23, audioCtx.currentTime + 0.15);
+            oscillator.frequency.setValueAtTime(293.66, audioCtx.currentTime + 0.3);
+
+            gainNode.gain.setValueAtTime(0.3, audioCtx.currentTime);
+            gainNode.gain.linearRampToValueAtTime(0.01, audioCtx.currentTime + 0.5);
+
+            oscillator.start(audioCtx.currentTime);
+            oscillator.stop(audioCtx.currentTime + 0.5);
+        }
+
+        // ==================== 游戏逻辑 ====================
+        function initGame() {
+            const diff = difficulties[currentDifficulty];
+
+            snake = [
+                { x: 10, y: 10 },
+                { x: 9, y: 10 },
+                { x: 8, y: 10 }
+            ];
+            direction = 'right';
+            nextDirection = 'right';
+            score = 0;
+            speed = diff.baseSpeed;
+            updateScore();
+            updateDifficultyBadge();
+            generateFood();
+        }
+
+        function updateDifficultyBadge() {
+            const diff = difficulties[currentDifficulty];
+            difficultyBadge.textContent = diff.name;
+            difficultyBadge.className = 'difficulty-badge ' + diff.class;
+        }
+
+        function generateFood() {
+            let newFood;
+            do {
+                newFood = {
+                    x: Math.floor(Math.random() * CELL_COUNT),
+                    y: Math.floor(Math.random() * CELL_COUNT)
+                };
+            } while (snake.some(segment => segment.x === newFood.x && segment.y === newFood.y));
+
+            // 随机选择另外两个角色中的一个作为食物
+            const otherCharacters = Object.keys(characters).filter(c => c !== currentCharacter);
+            newFood.character = otherCharacters[Math.floor(Math.random() * otherCharacters.length)];
+
+            food = newFood;
+        }
+
+        function moveSnake() {
+            direction = nextDirection;
+
+            const head = { ...snake[0] };
+
+            switch (direction) {
+                case 'up': head.y--; break;
+                case 'down': head.y++; break;
+                case 'left': head.x--; break;
+                case 'right': head.x++; break;
+            }
+
+            if (head.x < 0 || head.x >= CELL_COUNT || head.y < 0 || head.y >= CELL_COUNT) {
+                gameOver();
+                return;
+            }
+
+            if (snake.some(segment => segment.x === head.x && segment.y === head.y)) {
+                gameOver();
+                return;
+            }
+
+            snake.unshift(head);
+
+            if (head.x === food.x && head.y === food.y) {
+                const diff = difficulties[currentDifficulty];
+                score += diff.scorePerFood;
+                updateScore();
+                generateFood();
+                playEatSound();
+
+                if (speed > diff.minSpeed) {
+                    speed = Math.max(diff.minSpeed, diff.baseSpeed - Math.floor(score / 50) * diff.speedStep);
+                }
+            } else {
+                snake.pop();
+            }
+        }
+
+        function updateScore() {
+            scoreEl.textContent = score;
+            if (score > highScore) {
+                highScore = score;
+                highScoreEl.textContent = highScore;
+                localStorage.setItem('snakeV2HighScore', highScore);
+            }
+        }
+
+        function gameOver() {
+            gameState = 'over';
+            clearTimeout(gameLoop);
+            finalScoreEl.textContent = score;
+            gameOverOverlay.classList.remove('hidden');
+            playGameOverSound();
+        }
+
+        function startGame() {
+            initAudio();
+            initGame();
+            gameState = 'playing';
+            startOverlay.classList.add('hidden');
+            gameOverOverlay.classList.add('hidden');
+            pauseOverlay.classList.add('hidden');
+            runGameLoop();
+        }
+
+        function togglePause() {
+            if (gameState === 'playing') {
+                gameState = 'paused';
+                clearTimeout(gameLoop);
+                pauseOverlay.classList.remove('hidden');
+            } else if (gameState === 'paused') {
+                gameState = 'playing';
+                pauseOverlay.classList.add('hidden');
+                runGameLoop();
+            }
+        }
+
+        function runGameLoop() {
+            if (gameState !== 'playing') return;
+
+            moveSnake();
+            render();
+
+            gameLoop = setTimeout(runGameLoop, speed);
+        }
+
+        // ==================== 渲染 ====================
+        function render() {
+            // 背景
+            ctx.fillStyle = '#1a1a2e';
+            ctx.fillRect(0, 0, CANVAS_SIZE, CANVAS_SIZE);
+
+            // 网格
+            ctx.strokeStyle = 'rgba(255, 255, 255, 0.05)';
+            ctx.lineWidth = 1;
+            for (let i = 0; i <= CELL_COUNT; i++) {
+                ctx.beginPath();
+                ctx.moveTo(i * GRID_SIZE, 0);
+                ctx.lineTo(i * GRID_SIZE, CANVAS_SIZE);
+                ctx.stroke();
+                ctx.beginPath();
+                ctx.moveTo(0, i * GRID_SIZE);
+                ctx.lineTo(CANVAS_SIZE, i * GRID_SIZE);
+                ctx.stroke();
+            }
+
+            // 食物（使用其他角色的图片）
+            const foodImg = characterImages[food.character];
+            if (foodImg && foodImg.complete) {
+                ctx.save();
+                ctx.beginPath();
+                ctx.arc(
+                    food.x * GRID_SIZE + GRID_SIZE / 2,
+                    food.y * GRID_SIZE + GRID_SIZE / 2,
+                    GRID_SIZE / 2 - 2,
+                    0,
+                    Math.PI * 2
+                );
+                ctx.closePath();
+                ctx.clip();
+                ctx.drawImage(
+                    foodImg,
+                    food.x * GRID_SIZE + 2,
+                    food.y * GRID_SIZE + 2,
+                    GRID_SIZE - 4,
+                    GRID_SIZE - 4
+                );
+                ctx.restore();
+
+                // 食物光晕
+                ctx.shadowColor = characters[food.character].color;
+                ctx.shadowBlur = 15;
+                ctx.strokeStyle = characters[food.character].color;
+                ctx.lineWidth = 2;
+                ctx.beginPath();
+                ctx.arc(
+                    food.x * GRID_SIZE + GRID_SIZE / 2,
+                    food.y * GRID_SIZE + GRID_SIZE / 2,
+                    GRID_SIZE / 2 - 1,
+                    0,
+                    Math.PI * 2
+                );
+                ctx.stroke();
+                ctx.shadowBlur = 0;
+            }
+
+            // 蛇身
+            const characterColor = characters[currentCharacter].color;
+            snake.forEach((segment, index) => {
+                if (index === 0) {
+                    // 蛇头使用角色图片
+                    const headImg = characterImages[currentCharacter];
+                    if (headImg && headImg.complete) {
+                        ctx.save();
+                        ctx.beginPath();
+                        ctx.arc(
+                            segment.x * GRID_SIZE + GRID_SIZE / 2,
+                            segment.y * GRID_SIZE + GRID_SIZE / 2,
+                            GRID_SIZE / 2 - 1,
+                            0,
+                            Math.PI * 2
+                        );
+                        ctx.closePath();
+                        ctx.clip();
+                        ctx.drawImage(
+                            headImg,
+                            segment.x * GRID_SIZE + 1,
+                            segment.y * GRID_SIZE + 1,
+                            GRID_SIZE - 2,
+                            GRID_SIZE - 2
+                        );
+                        ctx.restore();
+
+                        // 蛇头边框
+                        ctx.strokeStyle = characterColor;
+                        ctx.lineWidth = 2;
+                        ctx.beginPath();
+                        ctx.arc(
+                            segment.x * GRID_SIZE + GRID_SIZE / 2,
+                            segment.y * GRID_SIZE + GRID_SIZE / 2,
+                            GRID_SIZE / 2 - 1,
+                            0,
+                            Math.PI * 2
+                        );
+                        ctx.stroke();
+                    }
+                } else {
+                    // 蛇身使用渐变颜色
+                    const ratio = index / snake.length;
+                    const alpha = 1 - ratio * 0.5;
+                    ctx.fillStyle = characterColor;
+                    ctx.globalAlpha = alpha;
+
+                    const radius = 4;
+                    roundRect(
+                        ctx,
+                        segment.x * GRID_SIZE + 2,
+                        segment.y * GRID_SIZE + 2,
+                        GRID_SIZE - 4,
+                        GRID_SIZE - 4,
+                        radius
+                    );
+                    ctx.globalAlpha = 1;
+                }
+            });
+        }
+
+        function roundRect(ctx, x, y, width, height, radius) {
+            ctx.beginPath();
+            ctx.moveTo(x + radius, y);
+            ctx.lineTo(x + width - radius, y);
+            ctx.quadraticCurveTo(x + width, y, x + width, y + radius);
+            ctx.lineTo(x + width, y + height - radius);
+            ctx.quadraticCurveTo(x + width, y + height, x + width - radius, y + height);
+            ctx.lineTo(x + radius, y + height);
+            ctx.quadraticCurveTo(x, y + height, x, y + height - radius);
+            ctx.lineTo(x, y + radius);
+            ctx.quadraticCurveTo(x, y, x + radius, y);
+            ctx.closePath();
+            ctx.fill();
+        }
+
+        function applyCharacter(charName) {
+            currentCharacter = charName;
+            localStorage.setItem('snakeV2Character', charName);
+
+            characterBtns.forEach(btn => {
+                btn.classList.toggle('active', btn.dataset.character === charName);
+            });
+
+            if (gameState === 'waiting') {
+                generateFood();
+                render();
+            }
+        }
+
+        function applyDifficulty(diffName) {
+            currentDifficulty = diffName;
+            localStorage.setItem('snakeV2Difficulty', diffName);
+            updateDifficultyBadge();
+
+            difficultyBtns.forEach(btn => {
+                btn.classList.toggle('active', btn.dataset.difficulty === diffName);
+            });
+
+            if (gameState === 'waiting') {
+                initGame();
+                render();
+            }
+        }
+
+        // ==================== 事件监听 ====================
+
+        // 触摸滑动控制
+        let touchStartX = 0;
+        let touchStartY = 0;
+        let touchHandled = false;
+        const MIN_SWIPE_DISTANCE = 20;
+
+        canvas.addEventListener('touchstart', (e) => {
+            touchStartX = e.touches[0].clientX;
+            touchStartY = e.touches[0].clientY;
+            touchHandled = false;
+            e.preventDefault();
+        }, { passive: false });
+
+        canvas.addEventListener('touchmove', (e) => {
+            if (gameState !== 'playing' || touchHandled) return;
+
+            const touchX = e.touches[0].clientX;
+            const touchY = e.touches[0].clientY;
+            const deltaX = touchX - touchStartX;
+            const deltaY = touchY - touchStartY;
+
+            if (Math.abs(deltaX) < MIN_SWIPE_DISTANCE && Math.abs(deltaY) < MIN_SWIPE_DISTANCE) {
+                return;
+            }
+
+            const opposites = { up: 'down', down: 'up', left: 'right', right: 'left' };
+            let newDir;
+
+            if (Math.abs(deltaX) > Math.abs(deltaY)) {
+                newDir = deltaX > 0 ? 'right' : 'left';
+            } else {
+                newDir = deltaY > 0 ? 'down' : 'up';
+            }
+
+            if (opposites[newDir] !== direction) {
+                nextDirection = newDir;
+                touchHandled = true;
+                touchStartX = touchX;
+                touchStartY = touchY;
+                setTimeout(() => { touchHandled = false; }, 100);
+            }
+
+            e.preventDefault();
+        }, { passive: false });
+
+        canvas.addEventListener('touchend', (e) => {
+            if (gameState !== 'playing') {
+                if (gameState === 'waiting' || gameState === 'over') {
+                    startGame();
+                } else if (gameState === 'paused') {
+                    togglePause();
+                }
+                return;
+            }
+
+            if (!touchHandled) {
+                const touchEndX = e.changedTouches[0].clientX;
+                const touchEndY = e.changedTouches[0].clientY;
+                const deltaX = touchEndX - touchStartX;
+                const deltaY = touchEndY - touchStartY;
+
+                if (Math.abs(deltaX) < MIN_SWIPE_DISTANCE && Math.abs(deltaY) < MIN_SWIPE_DISTANCE) {
+                    togglePause();
+                }
+            }
+        }, { passive: false });
+
+        // Overlay 触摸/点击事件
+        const overlays = [startOverlay, pauseOverlay, gameOverOverlay];
+        overlays.forEach(overlay => {
+            overlay.addEventListener('touchend', (e) => {
+                e.preventDefault();
+                initAudio();
+                if (gameState === 'waiting' || gameState === 'over') {
+                    startGame();
+                } else if (gameState === 'paused') {
+                    togglePause();
+                }
+            }, { passive: false });
+
+            overlay.addEventListener('click', (e) => {
+                initAudio();
+                if (gameState === 'waiting' || gameState === 'over') {
+                    startGame();
+                } else if (gameState === 'paused') {
+                    togglePause();
+                }
+            });
+        });
+
+        // 虚拟方向键控制
+        const virtualBtns = document.querySelectorAll('.virtual-btn[data-direction]');
+        virtualBtns.forEach(btn => {
+            btn.addEventListener('touchstart', (e) => {
+                e.preventDefault();
+                initAudio();
+
+                if (gameState !== 'playing') {
+                    if (gameState === 'waiting' || gameState === 'over') {
+                        startGame();
+                    }
+                    return;
+                }
+
+                const newDir = btn.dataset.direction;
+                const opposites = { up: 'down', down: 'up', left: 'right', right: 'left' };
+
+                if (opposites[newDir] !== direction) {
+                    nextDirection = newDir;
+                }
+            }, { passive: false });
+
+            btn.addEventListener('click', () => {
+                initAudio();
+
+                if (gameState !== 'playing') {
+                    if (gameState === 'waiting' || gameState === 'over') {
+                        startGame();
+                    }
+                    return;
+                }
+
+                const newDir = btn.dataset.direction;
+                const opposites = { up: 'down', down: 'up', left: 'right', right: 'left' };
+
+                if (opposites[newDir] !== direction) {
+                    nextDirection = newDir;
+                }
+            });
+        });
+
+        document.addEventListener('keydown', (e) => {
+            const keyMap = {
+                'ArrowUp': 'up', 'KeyW': 'up',
+                'ArrowDown': 'down', 'KeyS': 'down',
+                'ArrowLeft': 'left', 'KeyA': 'left',
+                'ArrowRight': 'right', 'KeyD': 'right'
+            };
+
+            if (keyMap[e.code] && gameState === 'playing') {
+                const newDir = keyMap[e.code];
+                const opposites = { up: 'down', down: 'up', left: 'right', right: 'left' };
+
+                if (opposites[newDir] !== direction) {
+                    nextDirection = newDir;
+                }
+                e.preventDefault();
+            }
+
+            if (e.code === 'Space') {
+                e.preventDefault();
+                if (gameState === 'waiting' || gameState === 'over') {
+                    startGame();
+                } else {
+                    togglePause();
+                }
+            }
+
+            if (e.code === 'KeyR' && (gameState === 'over' || gameState === 'playing' || gameState === 'paused')) {
+                startGame();
+            }
+        });
+
+        soundBtn.addEventListener('click', () => {
+            initAudio();
+            soundEnabled = !soundEnabled;
+            soundBtn.textContent = soundEnabled ? '🔊 音效' : '🔇 静音';
+            soundBtn.classList.toggle('active', soundEnabled);
+            localStorage.setItem('snakeV2Sound', soundEnabled);
+        });
+
+        difficultyBtns.forEach(btn => {
+            btn.addEventListener('click', () => {
+                applyDifficulty(btn.dataset.difficulty);
+            });
+        });
+
+        characterBtns.forEach(btn => {
+            btn.addEventListener('click', () => {
+                applyCharacter(btn.dataset.character);
+            });
+        });
+
+        // ==================== 初始化 ====================
+        function init() {
+            highScoreEl.textContent = highScore;
+            soundBtn.textContent = soundEnabled ? '🔊 音效' : '🔇 静音';
+            soundBtn.classList.toggle('active', soundEnabled);
+
+            applyCharacter(currentCharacter);
+            applyDifficulty(currentDifficulty);
+
+            preloadImages();
+            initGame();
+        }
+
+        init();
+    </script>
+</body>
+</html>
