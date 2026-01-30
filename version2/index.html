@@ -65,6 +65,62 @@
         .difficulty-hard { background: #FF9800; color: white; }
         .difficulty-hell { background: #F44336; color: white; }
 
+        /* 克制关系徽章 */
+        .relation-badge {
+            display: inline-block;
+            padding: 6px 12px;
+            border-radius: 20px;
+            font-size: 0.85rem;
+            font-weight: bold;
+            transition: all 0.3s ease;
+        }
+
+        .relation-neutral { background: #607D8B; color: white; }
+        .relation-advantage {
+            background: linear-gradient(135deg, #4CAF50, #8BC34A);
+            color: white;
+            animation: pulse-green 1.5s infinite;
+        }
+        .relation-disadvantage {
+            background: linear-gradient(135deg, #F44336, #FF5722);
+            color: white;
+            animation: pulse-red 1s infinite;
+        }
+
+        @keyframes pulse-green {
+            0%, 100% { box-shadow: 0 0 5px rgba(76, 175, 80, 0.5); }
+            50% { box-shadow: 0 0 20px rgba(76, 175, 80, 0.8); }
+        }
+
+        @keyframes pulse-red {
+            0%, 100% { box-shadow: 0 0 5px rgba(244, 67, 54, 0.5); }
+            50% { box-shadow: 0 0 15px rgba(244, 67, 54, 0.8); }
+        }
+
+        /* 相克关系图例 */
+        .counter-legend {
+            margin-top: 15px;
+            padding: 10px;
+            background: rgba(255, 255, 255, 0.08);
+            border-radius: 10px;
+            border: 1px solid rgba(255, 255, 255, 0.15);
+        }
+
+        .legend-title {
+            color: rgba(255, 255, 255, 0.7);
+            font-size: 0.75rem;
+            text-align: center;
+            margin-bottom: 8px;
+        }
+
+        .legend-item {
+            color: rgba(255, 255, 255, 0.9);
+            font-size: 0.8rem;
+            text-align: center;
+            padding: 3px 0;
+            font-family: monospace;
+        }
+
         /* 游戏主体区域 */
         .game-area {
             display: flex;
@@ -453,6 +509,10 @@
                 <div class="label">最高分</div>
                 <div class="value" id="highScore">0</div>
             </div>
+            <div class="score-item">
+                <div class="label">克制关系</div>
+                <div id="relationBadge" class="relation-badge relation-neutral">-</div>
+            </div>
         </div>
 
         <!-- 游戏主体区域 -->
@@ -471,7 +531,11 @@
                 <canvas id="gameCanvas" width="500" height="500"></canvas>
                 <div class="overlay" id="startOverlay">
                     <h2>🐍 贪吃蛇 V2</h2>
-                    <p>角色版 - 选择你的角色开始游戏</p>
+                    <p>角色版 - 相生相克</p>
+                    <p style="font-size: 0.9rem; opacity: 0.8; margin-top: 10px;">
+                        🟢 克制目标时：多个食物出现<br>
+                        🔴 被目标克制时：食物会逃跑
+                    </p>
                     <p class="desktop-hint">按 <kbd>空格</kbd> 开始游戏</p>
                     <p class="mobile-hint">点击屏幕开始游戏</p>
                 </div>
@@ -503,6 +567,12 @@
                     <img src="images/xz.jpg" alt="XZ">
                     <span class="name">XZ</span>
                 </button>
+                <div class="counter-legend">
+                    <div class="legend-title">相克关系</div>
+                    <div class="legend-item">XM → RX</div>
+                    <div class="legend-item">RX → XZ</div>
+                    <div class="legend-item">XZ → XM</div>
+                </div>
             </div>
         </div>
 
@@ -562,11 +632,31 @@
             xz: { name: 'XZ', image: 'images/xz.jpg', color: '#FFE66D' }
         };
 
+        // 相生相克关系：key 克制 value
+        // XM克RX, RX克XZ, XZ克XM
+        const counters = {
+            xm: 'rx',  // XM 克 RX
+            rx: 'xz',  // RX 克 XZ
+            xz: 'xm'   // XZ 克 XM
+        };
+
+        // 获取克制关系
+        function getCounterRelation(player, food) {
+            if (counters[player] === food) {
+                return 'advantage';    // 玩家克制食物，优势
+            } else if (counters[food] === player) {
+                return 'disadvantage'; // 食物克制玩家，劣势
+            }
+            return 'neutral';          // 中立
+        }
+
         // ==================== 游戏状态 ====================
         let snake = [];
         let direction = 'right';
         let nextDirection = 'right';
-        let food = { x: 0, y: 0, character: 'xm' };
+        let foods = [];  // 改为数组，支持多个食物
+        let currentRelation = 'neutral';  // 当前克制关系
+        let foodMoveTimer = null;  // 食物移动计时器
         let score = 0;
         let highScore = parseInt(localStorage.getItem('snakeV2HighScore')) || 0;
         let gameState = 'waiting';
@@ -606,8 +696,42 @@
         const gameOverOverlay = document.getElementById('gameOverOverlay');
         const soundBtn = document.getElementById('soundBtn');
         const difficultyBadge = document.getElementById('difficultyBadge');
+        const relationBadge = document.getElementById('relationBadge');
         const difficultyBtns = document.querySelectorAll('[data-difficulty]');
         const characterBtns = document.querySelectorAll('[data-character]');
+
+        // 更新克制关系显示
+        function updateRelationBadge() {
+            const relationTexts = {
+                neutral: '中立',
+                advantage: '克制! 🎯',
+                disadvantage: '被克! ⚡'
+            };
+
+            const relationClasses = {
+                neutral: 'relation-neutral',
+                advantage: 'relation-advantage',
+                disadvantage: 'relation-disadvantage'
+            };
+
+            if (foods.length > 0) {
+                const foodChar = foods[0].character;
+                const playerName = characters[currentCharacter].name;
+                const foodName = characters[foodChar].name;
+
+                if (currentRelation === 'advantage') {
+                    relationBadge.textContent = `${playerName}克${foodName}`;
+                } else if (currentRelation === 'disadvantage') {
+                    relationBadge.textContent = `${foodName}克${playerName}`;
+                } else {
+                    relationBadge.textContent = relationTexts[currentRelation];
+                }
+            } else {
+                relationBadge.textContent = relationTexts[currentRelation];
+            }
+
+            relationBadge.className = 'relation-badge ' + relationClasses[currentRelation];
+        }
 
         // ==================== 音效系统 ====================
         let audioCtx = null;
@@ -655,6 +779,26 @@
 
             oscillator.start(audioCtx.currentTime);
             oscillator.stop(audioCtx.currentTime + 0.5);
+        }
+
+        function playFoodMoveSound() {
+            if (!soundEnabled || !audioCtx) return;
+
+            const oscillator = audioCtx.createOscillator();
+            const gainNode = audioCtx.createGain();
+
+            oscillator.connect(gainNode);
+            gainNode.connect(audioCtx.destination);
+
+            oscillator.type = 'sine';
+            oscillator.frequency.setValueAtTime(800, audioCtx.currentTime);
+            oscillator.frequency.linearRampToValueAtTime(400, audioCtx.currentTime + 0.1);
+
+            gainNode.gain.setValueAtTime(0.15, audioCtx.currentTime);
+            gainNode.gain.linearRampToValueAtTime(0.01, audioCtx.currentTime + 0.1);
+
+            oscillator.start(audioCtx.currentTime);
+            oscillator.stop(audioCtx.currentTime + 0.1);
         }
 
         // ==================== 灌篮高手主题曲 8-bit BGM ====================
@@ -838,19 +982,97 @@
         }
 
         function generateFood() {
-            let newFood;
-            do {
-                newFood = {
-                    x: Math.floor(Math.random() * CELL_COUNT),
-                    y: Math.floor(Math.random() * CELL_COUNT)
-                };
-            } while (snake.some(segment => segment.x === newFood.x && segment.y === newFood.y));
+            // 清除之前的食物移动计时器
+            if (foodMoveTimer) {
+                clearInterval(foodMoveTimer);
+                foodMoveTimer = null;
+            }
 
             // 随机选择另外两个角色中的一个作为食物
             const otherCharacters = Object.keys(characters).filter(c => c !== currentCharacter);
-            newFood.character = otherCharacters[Math.floor(Math.random() * otherCharacters.length)];
+            const foodCharacter = otherCharacters[Math.floor(Math.random() * otherCharacters.length)];
 
-            food = newFood;
+            // 判断克制关系
+            currentRelation = getCounterRelation(currentCharacter, foodCharacter);
+
+            // 根据克制关系决定生成食物数量
+            let foodCount = 1;
+            if (currentRelation === 'advantage') {
+                foodCount = 3;  // 优势时生成3个食物
+            }
+
+            foods = [];
+            for (let i = 0; i < foodCount; i++) {
+                let newFood;
+                do {
+                    newFood = {
+                        x: Math.floor(Math.random() * CELL_COUNT),
+                        y: Math.floor(Math.random() * CELL_COUNT),
+                        character: foodCharacter
+                    };
+                } while (
+                    snake.some(segment => segment.x === newFood.x && segment.y === newFood.y) ||
+                    foods.some(f => f.x === newFood.x && f.y === newFood.y)
+                );
+                foods.push(newFood);
+            }
+
+            // 劣势时，食物会随机移动
+            if (currentRelation === 'disadvantage') {
+                startFoodMovement();
+            }
+
+            // 更新UI显示
+            updateRelationBadge();
+        }
+
+        // 食物随机移动（劣势时触发）
+        function startFoodMovement() {
+            if (foodMoveTimer) {
+                clearInterval(foodMoveTimer);
+            }
+
+            foodMoveTimer = setInterval(() => {
+                if (gameState !== 'playing' || foods.length === 0) return;
+
+                let moved = false;
+                foods = foods.map(f => {
+                    // 50%概率移动
+                    if (Math.random() > 0.5) return f;
+
+                    // 随机方向移动1-2格
+                    const directions = [
+                        { dx: 0, dy: -1 }, // 上
+                        { dx: 0, dy: 1 },  // 下
+                        { dx: -1, dy: 0 }, // 左
+                        { dx: 1, dy: 0 }   // 右
+                    ];
+                    const dir = directions[Math.floor(Math.random() * directions.length)];
+                    const steps = Math.floor(Math.random() * 2) + 1;
+
+                    let newX = f.x + dir.dx * steps;
+                    let newY = f.y + dir.dy * steps;
+
+                    // 边界检测
+                    newX = Math.max(0, Math.min(CELL_COUNT - 1, newX));
+                    newY = Math.max(0, Math.min(CELL_COUNT - 1, newY));
+
+                    // 检查是否与蛇身重叠
+                    if (snake.some(segment => segment.x === newX && segment.y === newY)) {
+                        return f;  // 保持原位
+                    }
+
+                    if (newX !== f.x || newY !== f.y) {
+                        moved = true;
+                    }
+
+                    return { ...f, x: newX, y: newY };
+                });
+
+                if (moved) {
+                    playFoodMoveSound();
+                }
+            }, 800);  // 每800ms移动一次
         }
 
         function moveSnake() {
@@ -877,11 +1099,22 @@
 
             snake.unshift(head);
 
-            if (head.x === food.x && head.y === food.y) {
+            // 检查是否吃到任意一个食物
+            const eatenFoodIndex = foods.findIndex(f => f.x === head.x && f.y === head.y);
+            if (eatenFoodIndex !== -1) {
                 const diff = difficulties[currentDifficulty];
-                score += diff.scorePerFood;
+
+                // 根据克制关系调整得分
+                let scoreMultiplier = 1;
+                if (currentRelation === 'advantage') {
+                    scoreMultiplier = 1;  // 优势时正常得分
+                } else if (currentRelation === 'disadvantage') {
+                    scoreMultiplier = 2;  // 劣势时双倍得分（奖励难度）
+                }
+
+                score += diff.scorePerFood * scoreMultiplier;
                 updateScore();
-                generateFood();
+                generateFood();  // 重新生成食物
                 playEatSound();
 
                 if (speed > diff.minSpeed) {
@@ -904,6 +1137,10 @@
         function gameOver() {
             gameState = 'over';
             clearTimeout(gameLoop);
+            if (foodMoveTimer) {
+                clearInterval(foodMoveTimer);
+                foodMoveTimer = null;
+            }
             stopBGM();
             finalScoreEl.textContent = score;
             gameOverOverlay.classList.remove('hidden');
@@ -929,6 +1166,10 @@
             if (gameState === 'playing') {
                 gameState = 'paused';
                 clearTimeout(gameLoop);
+                if (foodMoveTimer) {
+                    clearInterval(foodMoveTimer);
+                    foodMoveTimer = null;
+                }
                 stopBGM();
                 pauseOverlay.classList.remove('hidden');
             } else if (gameState === 'paused') {
@@ -936,6 +1177,10 @@
                 pauseOverlay.classList.add('hidden');
                 if (musicEnabled) {
                     startBGM();
+                }
+                // 恢复食物移动（如果处于劣势）
+                if (currentRelation === 'disadvantage') {
+                    startFoodMovement();
                 }
                 runGameLoop();
             }
@@ -970,45 +1215,54 @@
                 ctx.stroke();
             }
 
-            // 食物（使用其他角色的图片）
-            const foodImg = characterImages[food.character];
-            if (foodImg && foodImg.complete) {
-                ctx.save();
-                ctx.beginPath();
-                ctx.arc(
-                    food.x * GRID_SIZE + GRID_SIZE / 2,
-                    food.y * GRID_SIZE + GRID_SIZE / 2,
-                    GRID_SIZE / 2 - 2,
-                    0,
-                    Math.PI * 2
-                );
-                ctx.closePath();
-                ctx.clip();
-                ctx.drawImage(
-                    foodImg,
-                    food.x * GRID_SIZE + 2,
-                    food.y * GRID_SIZE + 2,
-                    GRID_SIZE - 4,
-                    GRID_SIZE - 4
-                );
-                ctx.restore();
+            // 绘制所有食物
+            foods.forEach(food => {
+                const foodImg = characterImages[food.character];
+                if (foodImg && foodImg.complete) {
+                    ctx.save();
+                    ctx.beginPath();
+                    ctx.arc(
+                        food.x * GRID_SIZE + GRID_SIZE / 2,
+                        food.y * GRID_SIZE + GRID_SIZE / 2,
+                        GRID_SIZE / 2 - 2,
+                        0,
+                        Math.PI * 2
+                    );
+                    ctx.closePath();
+                    ctx.clip();
+                    ctx.drawImage(
+                        foodImg,
+                        food.x * GRID_SIZE + 2,
+                        food.y * GRID_SIZE + 2,
+                        GRID_SIZE - 4,
+                        GRID_SIZE - 4
+                    );
+                    ctx.restore();
 
-                // 食物光晕
-                ctx.shadowColor = characters[food.character].color;
-                ctx.shadowBlur = 15;
-                ctx.strokeStyle = characters[food.character].color;
-                ctx.lineWidth = 2;
-                ctx.beginPath();
-                ctx.arc(
-                    food.x * GRID_SIZE + GRID_SIZE / 2,
-                    food.y * GRID_SIZE + GRID_SIZE / 2,
-                    GRID_SIZE / 2 - 1,
-                    0,
-                    Math.PI * 2
-                );
-                ctx.stroke();
-                ctx.shadowBlur = 0;
-            }
+                    // 食物光晕 - 根据克制关系显示不同颜色
+                    let glowColor = characters[food.character].color;
+                    if (currentRelation === 'advantage') {
+                        glowColor = '#00FF00';  // 绿色光晕表示优势
+                    } else if (currentRelation === 'disadvantage') {
+                        glowColor = '#FF0000';  // 红色光晕表示劣势
+                    }
+
+                    ctx.shadowColor = glowColor;
+                    ctx.shadowBlur = currentRelation === 'disadvantage' ? 20 : 15;
+                    ctx.strokeStyle = glowColor;
+                    ctx.lineWidth = currentRelation === 'neutral' ? 2 : 3;
+                    ctx.beginPath();
+                    ctx.arc(
+                        food.x * GRID_SIZE + GRID_SIZE / 2,
+                        food.y * GRID_SIZE + GRID_SIZE / 2,
+                        GRID_SIZE / 2 - 1,
+                        0,
+                        Math.PI * 2
+                    );
+                    ctx.stroke();
+                    ctx.shadowBlur = 0;
+                }
+            });
 
             // 蛇身
             const characterColor = characters[currentCharacter].color;
@@ -1314,6 +1568,10 @@
 
             applyCharacter(currentCharacter);
             applyDifficulty(currentDifficulty);
+
+            // 初始化克制关系显示
+            currentRelation = 'neutral';
+            updateRelationBadge();
 
             preloadImages();
             initGame();
