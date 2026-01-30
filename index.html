@@ -1,0 +1,934 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>贪吃蛇</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', 'Microsoft YaHei', sans-serif;
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            transition: background-color 0.5s ease;
+            padding: 20px;
+        }
+
+        .main-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 20px;
+        }
+
+        /* 顶部分数区域 */
+        .score-header {
+            display: flex;
+            gap: 50px;
+            align-items: center;
+        }
+
+        .score-item {
+            color: rgba(255, 255, 255, 0.9);
+            font-size: 1.2rem;
+            text-align: center;
+        }
+
+        .score-item .label {
+            font-size: 0.9rem;
+            opacity: 0.7;
+            margin-bottom: 5px;
+        }
+
+        .score-item .value {
+            font-weight: bold;
+            font-size: 2rem;
+        }
+
+        .difficulty-badge {
+            display: inline-block;
+            padding: 6px 16px;
+            border-radius: 20px;
+            font-size: 0.9rem;
+            font-weight: bold;
+        }
+
+        .difficulty-easy { background: #4CAF50; color: white; }
+        .difficulty-normal { background: #2196F3; color: white; }
+        .difficulty-hard { background: #FF9800; color: white; }
+        .difficulty-hell { background: #F44336; color: white; }
+
+        /* 游戏主体区域 */
+        .game-area {
+            display: flex;
+            align-items: center;
+            gap: 30px;
+        }
+
+        /* 侧边栏通用样式 */
+        .sidebar {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            min-width: 100px;
+        }
+
+        .sidebar-title {
+            color: rgba(255, 255, 255, 0.7);
+            font-size: 0.85rem;
+            text-align: center;
+            margin-bottom: 5px;
+        }
+
+        .sidebar-btn {
+            padding: 10px 16px;
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            border-radius: 10px;
+            background: rgba(255, 255, 255, 0.08);
+            color: rgba(255, 255, 255, 0.8);
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-size: 0.9rem;
+            text-align: center;
+        }
+
+        .sidebar-btn:hover {
+            background: rgba(255, 255, 255, 0.15);
+            border-color: rgba(255, 255, 255, 0.5);
+            color: white;
+        }
+
+        .sidebar-btn.active {
+            background: rgba(255, 255, 255, 0.25);
+            border-color: white;
+            color: white;
+        }
+
+        /* 游戏画布 */
+        .game-wrapper {
+            position: relative;
+            display: inline-block;
+        }
+
+        #gameCanvas {
+            border-radius: 12px;
+            box-shadow: 0 0 30px rgba(0, 0, 0, 0.5), 0 0 60px rgba(0, 0, 0, 0.3);
+        }
+
+        .overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            background: rgba(0, 0, 0, 0.7);
+            border-radius: 12px;
+            opacity: 1;
+            transition: opacity 0.3s ease;
+        }
+
+        .overlay.hidden {
+            opacity: 0;
+            pointer-events: none;
+        }
+
+        .overlay h2 {
+            color: white;
+            font-size: 2rem;
+            margin-bottom: 15px;
+            text-shadow: 0 0 20px rgba(255, 255, 255, 0.5);
+        }
+
+        .overlay p {
+            color: rgba(255, 255, 255, 0.8);
+            font-size: 1.1rem;
+            margin-bottom: 10px;
+        }
+
+        .overlay .final-score {
+            font-size: 3rem;
+            font-weight: bold;
+            color: #FFD700;
+            text-shadow: 0 0 30px rgba(255, 215, 0, 0.7);
+            margin: 20px 0;
+        }
+
+        /* 底部控制区 */
+        .bottom-controls {
+            display: flex;
+            gap: 15px;
+            align-items: center;
+        }
+
+        .control-btn {
+            padding: 10px 20px;
+            border: 2px solid rgba(255, 255, 255, 0.4);
+            border-radius: 25px;
+            background: rgba(255, 255, 255, 0.1);
+            color: white;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-size: 0.95rem;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .control-btn:hover {
+            background: rgba(255, 255, 255, 0.2);
+            border-color: rgba(255, 255, 255, 0.6);
+            transform: translateY(-2px);
+        }
+
+        .control-btn.active {
+            background: rgba(255, 255, 255, 0.3);
+            border-color: white;
+        }
+
+        .music-visualizer {
+            display: flex;
+            align-items: flex-end;
+            gap: 2px;
+            height: 16px;
+        }
+
+        .music-visualizer .bar {
+            width: 3px;
+            background: white;
+            border-radius: 1px;
+            animation: musicBar 0.5s ease-in-out infinite;
+        }
+
+        .music-visualizer .bar:nth-child(1) { animation-delay: 0s; }
+        .music-visualizer .bar:nth-child(2) { animation-delay: 0.1s; }
+        .music-visualizer .bar:nth-child(3) { animation-delay: 0.2s; }
+        .music-visualizer .bar:nth-child(4) { animation-delay: 0.3s; }
+
+        @keyframes musicBar {
+            0%, 100% { height: 4px; }
+            50% { height: 14px; }
+        }
+
+        .music-visualizer.paused .bar {
+            animation: none;
+            height: 4px;
+        }
+
+        /* 操作说明 */
+        .instructions {
+            color: rgba(255, 255, 255, 0.5);
+            font-size: 0.85rem;
+            text-align: center;
+        }
+
+        .instructions kbd {
+            padding: 3px 8px;
+            background: rgba(255, 255, 255, 0.12);
+            border-radius: 4px;
+            margin: 0 2px;
+        }
+    </style>
+</head>
+<body>
+    <div class="main-container">
+        <!-- 顶部分数区域 -->
+        <div class="score-header">
+            <div class="score-item">
+                <div class="label">当前分数</div>
+                <div class="value" id="score">0</div>
+            </div>
+            <div class="score-item">
+                <div class="label">难度</div>
+                <div id="difficultyBadge" class="difficulty-badge difficulty-normal">普通</div>
+            </div>
+            <div class="score-item">
+                <div class="label">最高分</div>
+                <div class="value" id="highScore">0</div>
+            </div>
+        </div>
+
+        <!-- 游戏主体区域 -->
+        <div class="game-area">
+            <!-- 左侧：难度选择 -->
+            <div class="sidebar">
+                <div class="sidebar-title">难度选择</div>
+                <button class="sidebar-btn" data-difficulty="easy">🟢 简单</button>
+                <button class="sidebar-btn active" data-difficulty="normal">🔵 普通</button>
+                <button class="sidebar-btn" data-difficulty="hard">🟠 困难</button>
+                <button class="sidebar-btn" data-difficulty="hell">🔴 地狱</button>
+            </div>
+
+            <!-- 游戏画布 -->
+            <div class="game-wrapper">
+                <canvas id="gameCanvas" width="500" height="500"></canvas>
+                <div class="overlay" id="startOverlay">
+                    <h2>🐍 贪吃蛇</h2>
+                    <p>按 <kbd>空格</kbd> 开始游戏</p>
+                </div>
+                <div class="overlay hidden" id="pauseOverlay">
+                    <h2>⏸️ 暂停</h2>
+                    <p>按 <kbd>空格</kbd> 继续</p>
+                </div>
+                <div class="overlay hidden" id="gameOverOverlay">
+                    <h2>💀 游戏结束</h2>
+                    <div class="final-score" id="finalScore">0</div>
+                    <p>按 <kbd>空格</kbd> 或 <kbd>R</kbd> 重新开始</p>
+                </div>
+            </div>
+
+            <!-- 右侧：皮肤选择 -->
+            <div class="sidebar">
+                <div class="sidebar-title">主题皮肤</div>
+                <button class="sidebar-btn active" data-skin="classic">🟢 经典绿</button>
+                <button class="sidebar-btn" data-skin="neon">🔵 霓虹蓝</button>
+                <button class="sidebar-btn" data-skin="flame">🔴 烈焰红</button>
+                <button class="sidebar-btn" data-skin="night">🟣 暗夜紫</button>
+            </div>
+        </div>
+
+        <!-- 底部控制区 -->
+        <div class="bottom-controls">
+            <button class="control-btn active" id="soundBtn">🔊 音效</button>
+            <button class="control-btn" id="musicBtn">
+                🎵 背景音乐
+                <span class="music-visualizer paused" id="musicVisualizer">
+                    <span class="bar"></span>
+                    <span class="bar"></span>
+                    <span class="bar"></span>
+                    <span class="bar"></span>
+                </span>
+            </button>
+        </div>
+
+        <!-- 操作说明 -->
+        <div class="instructions">
+            <kbd>↑</kbd><kbd>↓</kbd><kbd>←</kbd><kbd>→</kbd> 或 <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> 移动 ｜
+            <kbd>空格</kbd> 开始/暂停 ｜ <kbd>R</kbd> 重新开始 ｜ <kbd>M</kbd> 音乐开关
+        </div>
+    </div>
+
+    <script>
+        // ==================== 游戏配置 ====================
+        const GRID_SIZE = 20;
+        const CANVAS_SIZE = 500;
+        const CELL_COUNT = CANVAS_SIZE / GRID_SIZE;
+
+        // 难度配置
+        const difficulties = {
+            easy:   { name: '简单', baseSpeed: 200, minSpeed: 100, speedStep: 5,  scorePerFood: 5,  class: 'difficulty-easy' },
+            normal: { name: '普通', baseSpeed: 150, minSpeed: 70,  speedStep: 10, scorePerFood: 10, class: 'difficulty-normal' },
+            hard:   { name: '困难', baseSpeed: 100, minSpeed: 50,  speedStep: 15, scorePerFood: 15, class: 'difficulty-hard' },
+            hell:   { name: '地狱', baseSpeed: 70,  minSpeed: 30,  speedStep: 20, scorePerFood: 20, class: 'difficulty-hell' }
+        };
+
+        // 皮肤配置
+        const skins = {
+            classic: {
+                name: '经典绿',
+                snake: ['#4CAF50', '#2E7D32'],
+                food: '#FF5722',
+                foodGlow: 'rgba(255, 87, 34, 0.6)',
+                bg: '#1a1a2e',
+                grid: 'rgba(255, 255, 255, 0.05)'
+            },
+            neon: {
+                name: '霓虹蓝',
+                snake: ['#00BCD4', '#006064'],
+                food: '#03A9F4',
+                foodGlow: 'rgba(3, 169, 244, 0.6)',
+                bg: '#0a1628',
+                grid: 'rgba(0, 188, 212, 0.1)'
+            },
+            flame: {
+                name: '烈焰红',
+                snake: ['#FF5722', '#BF360C'],
+                food: '#FFC107',
+                foodGlow: 'rgba(255, 193, 7, 0.6)',
+                bg: '#2d1810',
+                grid: 'rgba(255, 87, 34, 0.1)'
+            },
+            night: {
+                name: '暗夜紫',
+                snake: ['#9C27B0', '#4A148C'],
+                food: '#E91E63',
+                foodGlow: 'rgba(233, 30, 99, 0.6)',
+                bg: '#1a0a2e',
+                grid: 'rgba(156, 39, 176, 0.1)'
+            }
+        };
+
+        // ==================== 游戏状态 ====================
+        let snake = [];
+        let direction = 'right';
+        let nextDirection = 'right';
+        let food = { x: 0, y: 0 };
+        let score = 0;
+        let highScore = parseInt(localStorage.getItem('snakeHighScore')) || 0;
+        let gameState = 'waiting';
+        let speed = 150;
+        let gameLoop = null;
+        let currentSkin = localStorage.getItem('snakeSkin') || 'classic';
+        let currentDifficulty = localStorage.getItem('snakeDifficulty') || 'normal';
+        let soundEnabled = localStorage.getItem('snakeSound') !== 'false';
+        let musicEnabled = false;
+
+        // ==================== DOM 元素 ====================
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const scoreEl = document.getElementById('score');
+        const highScoreEl = document.getElementById('highScore');
+        const finalScoreEl = document.getElementById('finalScore');
+        const startOverlay = document.getElementById('startOverlay');
+        const pauseOverlay = document.getElementById('pauseOverlay');
+        const gameOverOverlay = document.getElementById('gameOverOverlay');
+        const soundBtn = document.getElementById('soundBtn');
+        const musicBtn = document.getElementById('musicBtn');
+        const musicVisualizer = document.getElementById('musicVisualizer');
+        const difficultyBadge = document.getElementById('difficultyBadge');
+        const difficultyBtns = document.querySelectorAll('[data-difficulty]');
+        const skinBtns = document.querySelectorAll('[data-skin]');
+
+        // ==================== 音效系统 ====================
+        let audioCtx = null;
+
+        function initAudio() {
+            if (!audioCtx) {
+                audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            }
+        }
+
+        function playEatSound() {
+            if (!soundEnabled || !audioCtx) return;
+
+            const oscillator = audioCtx.createOscillator();
+            const gainNode = audioCtx.createGain();
+
+            oscillator.connect(gainNode);
+            gainNode.connect(audioCtx.destination);
+
+            oscillator.frequency.setValueAtTime(587.33, audioCtx.currentTime);
+            oscillator.frequency.setValueAtTime(880, audioCtx.currentTime + 0.1);
+
+            gainNode.gain.setValueAtTime(0.3, audioCtx.currentTime);
+            gainNode.gain.linearRampToValueAtTime(0.01, audioCtx.currentTime + 0.15);
+
+            oscillator.start(audioCtx.currentTime);
+            oscillator.stop(audioCtx.currentTime + 0.15);
+        }
+
+        function playGameOverSound() {
+            if (!soundEnabled || !audioCtx) return;
+
+            const oscillator = audioCtx.createOscillator();
+            const gainNode = audioCtx.createGain();
+
+            oscillator.connect(gainNode);
+            gainNode.connect(audioCtx.destination);
+
+            oscillator.frequency.setValueAtTime(392, audioCtx.currentTime);
+            oscillator.frequency.setValueAtTime(349.23, audioCtx.currentTime + 0.15);
+            oscillator.frequency.setValueAtTime(293.66, audioCtx.currentTime + 0.3);
+
+            gainNode.gain.setValueAtTime(0.3, audioCtx.currentTime);
+            gainNode.gain.linearRampToValueAtTime(0.01, audioCtx.currentTime + 0.5);
+
+            oscillator.start(audioCtx.currentTime);
+            oscillator.stop(audioCtx.currentTime + 0.5);
+        }
+
+        // ==================== 8-bit 背景音乐 ====================
+        const bgmMelody = [
+            { note: 'E5', duration: 0.15 },
+            { note: 'E5', duration: 0.15 },
+            { note: 'E5', duration: 0.15 },
+            { note: 'C5', duration: 0.15 },
+            { note: 'E5', duration: 0.3 },
+            { note: 'G5', duration: 0.3 },
+            { note: 'G4', duration: 0.3 },
+            { note: 'C5', duration: 0.3 },
+            { note: 'G4', duration: 0.15 },
+            { note: 'E4', duration: 0.3 },
+            { note: 'A4', duration: 0.2 },
+            { note: 'B4', duration: 0.2 },
+            { note: 'Bb4', duration: 0.15 },
+            { note: 'A4', duration: 0.3 },
+            { note: 'G4', duration: 0.2 },
+            { note: 'E5', duration: 0.2 },
+            { note: 'G5', duration: 0.2 },
+            { note: 'A5', duration: 0.3 },
+            { note: 'F5', duration: 0.15 },
+            { note: 'G5', duration: 0.15 },
+            { note: 'E5', duration: 0.3 },
+            { note: 'C5', duration: 0.15 },
+            { note: 'D5', duration: 0.15 },
+            { note: 'B4', duration: 0.3 },
+        ];
+
+        const bgmBass = [
+            { note: 'C3', duration: 0.3 },
+            { note: 'G3', duration: 0.3 },
+            { note: 'C3', duration: 0.3 },
+            { note: 'G3', duration: 0.3 },
+            { note: 'F3', duration: 0.3 },
+            { note: 'C3', duration: 0.3 },
+            { note: 'G3', duration: 0.3 },
+            { note: 'C3', duration: 0.3 },
+        ];
+
+        const noteFrequencies = {
+            'C3': 130.81, 'D3': 146.83, 'E3': 164.81, 'F3': 174.61, 'G3': 196.00, 'A3': 220.00, 'B3': 246.94,
+            'C4': 261.63, 'D4': 293.66, 'E4': 329.63, 'F4': 349.23, 'G4': 392.00, 'A4': 440.00, 'Bb4': 466.16, 'B4': 493.88,
+            'C5': 523.25, 'D5': 587.33, 'E5': 659.25, 'F5': 698.46, 'G5': 783.99, 'A5': 880.00, 'B5': 987.77,
+        };
+
+        let melodyIndex = 0;
+        let bassIndex = 0;
+        let melodyTimeout = null;
+        let bassTimeout = null;
+
+        function playNote(frequency, duration, type = 'square', volume = 0.15) {
+            if (!audioCtx || !musicEnabled) return;
+
+            const oscillator = audioCtx.createOscillator();
+            const gainNode = audioCtx.createGain();
+
+            oscillator.type = type;
+            oscillator.frequency.setValueAtTime(frequency, audioCtx.currentTime);
+
+            gainNode.gain.setValueAtTime(volume, audioCtx.currentTime);
+            gainNode.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + duration * 0.9);
+
+            oscillator.connect(gainNode);
+            gainNode.connect(audioCtx.destination);
+
+            oscillator.start(audioCtx.currentTime);
+            oscillator.stop(audioCtx.currentTime + duration);
+        }
+
+        function playMelody() {
+            if (!musicEnabled || gameState !== 'playing') return;
+
+            const note = bgmMelody[melodyIndex];
+            const freq = noteFrequencies[note.note];
+            if (freq) {
+                playNote(freq, note.duration, 'square', 0.12);
+            }
+
+            melodyIndex = (melodyIndex + 1) % bgmMelody.length;
+            melodyTimeout = setTimeout(playMelody, note.duration * 1000);
+        }
+
+        function playBass() {
+            if (!musicEnabled || gameState !== 'playing') return;
+
+            const note = bgmBass[bassIndex];
+            const freq = noteFrequencies[note.note];
+            if (freq) {
+                playNote(freq, note.duration, 'triangle', 0.1);
+            }
+
+            bassIndex = (bassIndex + 1) % bgmBass.length;
+            bassTimeout = setTimeout(playBass, note.duration * 1000);
+        }
+
+        function startBGM() {
+            if (!musicEnabled) return;
+            initAudio();
+
+            melodyIndex = 0;
+            bassIndex = 0;
+
+            playMelody();
+            playBass();
+
+            musicVisualizer.classList.remove('paused');
+        }
+
+        function stopBGM() {
+            clearTimeout(melodyTimeout);
+            clearTimeout(bassTimeout);
+            musicVisualizer.classList.add('paused');
+        }
+
+        function toggleMusic() {
+            initAudio();
+            musicEnabled = !musicEnabled;
+
+            if (musicEnabled) {
+                musicBtn.classList.add('active');
+                if (gameState === 'playing') {
+                    startBGM();
+                }
+            } else {
+                musicBtn.classList.remove('active');
+                stopBGM();
+            }
+        }
+
+        // ==================== 游戏逻辑 ====================
+        function initGame() {
+            const diff = difficulties[currentDifficulty];
+
+            snake = [
+                { x: 10, y: 10 },
+                { x: 9, y: 10 },
+                { x: 8, y: 10 }
+            ];
+            direction = 'right';
+            nextDirection = 'right';
+            score = 0;
+            speed = diff.baseSpeed;
+            updateScore();
+            updateDifficultyBadge();
+            generateFood();
+        }
+
+        function updateDifficultyBadge() {
+            const diff = difficulties[currentDifficulty];
+            difficultyBadge.textContent = diff.name;
+            difficultyBadge.className = 'difficulty-badge ' + diff.class;
+        }
+
+        function generateFood() {
+            let newFood;
+            do {
+                newFood = {
+                    x: Math.floor(Math.random() * CELL_COUNT),
+                    y: Math.floor(Math.random() * CELL_COUNT)
+                };
+            } while (snake.some(segment => segment.x === newFood.x && segment.y === newFood.y));
+            food = newFood;
+        }
+
+        function moveSnake() {
+            direction = nextDirection;
+
+            const head = { ...snake[0] };
+
+            switch (direction) {
+                case 'up': head.y--; break;
+                case 'down': head.y++; break;
+                case 'left': head.x--; break;
+                case 'right': head.x++; break;
+            }
+
+            if (head.x < 0 || head.x >= CELL_COUNT || head.y < 0 || head.y >= CELL_COUNT) {
+                gameOver();
+                return;
+            }
+
+            if (snake.some(segment => segment.x === head.x && segment.y === head.y)) {
+                gameOver();
+                return;
+            }
+
+            snake.unshift(head);
+
+            if (head.x === food.x && head.y === food.y) {
+                const diff = difficulties[currentDifficulty];
+                score += diff.scorePerFood;
+                updateScore();
+                generateFood();
+                playEatSound();
+
+                if (speed > diff.minSpeed) {
+                    speed = Math.max(diff.minSpeed, diff.baseSpeed - Math.floor(score / 50) * diff.speedStep);
+                }
+            } else {
+                snake.pop();
+            }
+        }
+
+        function updateScore() {
+            scoreEl.textContent = score;
+            if (score > highScore) {
+                highScore = score;
+                highScoreEl.textContent = highScore;
+                localStorage.setItem('snakeHighScore', highScore);
+            }
+        }
+
+        function gameOver() {
+            gameState = 'over';
+            clearTimeout(gameLoop);
+            stopBGM();
+            finalScoreEl.textContent = score;
+            gameOverOverlay.classList.remove('hidden');
+            playGameOverSound();
+        }
+
+        function startGame() {
+            initAudio();
+            initGame();
+            gameState = 'playing';
+            startOverlay.classList.add('hidden');
+            gameOverOverlay.classList.add('hidden');
+            pauseOverlay.classList.add('hidden');
+
+            if (musicEnabled) {
+                startBGM();
+            }
+
+            runGameLoop();
+        }
+
+        function togglePause() {
+            if (gameState === 'playing') {
+                gameState = 'paused';
+                clearTimeout(gameLoop);
+                stopBGM();
+                pauseOverlay.classList.remove('hidden');
+            } else if (gameState === 'paused') {
+                gameState = 'playing';
+                pauseOverlay.classList.add('hidden');
+                if (musicEnabled) {
+                    startBGM();
+                }
+                runGameLoop();
+            }
+        }
+
+        function runGameLoop() {
+            if (gameState !== 'playing') return;
+
+            moveSnake();
+            render();
+
+            gameLoop = setTimeout(runGameLoop, speed);
+        }
+
+        // ==================== 渲染 ====================
+        function render() {
+            const skin = skins[currentSkin];
+
+            ctx.fillStyle = skin.bg;
+            ctx.fillRect(0, 0, CANVAS_SIZE, CANVAS_SIZE);
+
+            ctx.strokeStyle = skin.grid;
+            ctx.lineWidth = 1;
+            for (let i = 0; i <= CELL_COUNT; i++) {
+                ctx.beginPath();
+                ctx.moveTo(i * GRID_SIZE, 0);
+                ctx.lineTo(i * GRID_SIZE, CANVAS_SIZE);
+                ctx.stroke();
+                ctx.beginPath();
+                ctx.moveTo(0, i * GRID_SIZE);
+                ctx.lineTo(CANVAS_SIZE, i * GRID_SIZE);
+                ctx.stroke();
+            }
+
+            ctx.shadowColor = skin.foodGlow;
+            ctx.shadowBlur = 15;
+            ctx.fillStyle = skin.food;
+            ctx.beginPath();
+            ctx.arc(
+                food.x * GRID_SIZE + GRID_SIZE / 2,
+                food.y * GRID_SIZE + GRID_SIZE / 2,
+                GRID_SIZE / 2 - 2,
+                0,
+                Math.PI * 2
+            );
+            ctx.fill();
+            ctx.shadowBlur = 0;
+
+            snake.forEach((segment, index) => {
+                const ratio = index / snake.length;
+                const color = lerpColor(skin.snake[0], skin.snake[1], ratio);
+
+                ctx.fillStyle = color;
+
+                const radius = index === 0 ? 8 : 4;
+                roundRect(
+                    ctx,
+                    segment.x * GRID_SIZE + 1,
+                    segment.y * GRID_SIZE + 1,
+                    GRID_SIZE - 2,
+                    GRID_SIZE - 2,
+                    radius
+                );
+
+                if (index === 0) {
+                    ctx.fillStyle = 'white';
+                    const eyeOffset = GRID_SIZE / 4;
+                    let eyeX1, eyeY1, eyeX2, eyeY2;
+
+                    switch (direction) {
+                        case 'up':
+                            eyeX1 = segment.x * GRID_SIZE + eyeOffset;
+                            eyeY1 = segment.y * GRID_SIZE + eyeOffset;
+                            eyeX2 = segment.x * GRID_SIZE + GRID_SIZE - eyeOffset;
+                            eyeY2 = segment.y * GRID_SIZE + eyeOffset;
+                            break;
+                        case 'down':
+                            eyeX1 = segment.x * GRID_SIZE + eyeOffset;
+                            eyeY1 = segment.y * GRID_SIZE + GRID_SIZE - eyeOffset;
+                            eyeX2 = segment.x * GRID_SIZE + GRID_SIZE - eyeOffset;
+                            eyeY2 = segment.y * GRID_SIZE + GRID_SIZE - eyeOffset;
+                            break;
+                        case 'left':
+                            eyeX1 = segment.x * GRID_SIZE + eyeOffset;
+                            eyeY1 = segment.y * GRID_SIZE + eyeOffset;
+                            eyeX2 = segment.x * GRID_SIZE + eyeOffset;
+                            eyeY2 = segment.y * GRID_SIZE + GRID_SIZE - eyeOffset;
+                            break;
+                        case 'right':
+                            eyeX1 = segment.x * GRID_SIZE + GRID_SIZE - eyeOffset;
+                            eyeY1 = segment.y * GRID_SIZE + eyeOffset;
+                            eyeX2 = segment.x * GRID_SIZE + GRID_SIZE - eyeOffset;
+                            eyeY2 = segment.y * GRID_SIZE + GRID_SIZE - eyeOffset;
+                            break;
+                    }
+
+                    ctx.beginPath();
+                    ctx.arc(eyeX1, eyeY1, 3, 0, Math.PI * 2);
+                    ctx.arc(eyeX2, eyeY2, 3, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+            });
+        }
+
+        function roundRect(ctx, x, y, width, height, radius) {
+            ctx.beginPath();
+            ctx.moveTo(x + radius, y);
+            ctx.lineTo(x + width - radius, y);
+            ctx.quadraticCurveTo(x + width, y, x + width, y + radius);
+            ctx.lineTo(x + width, y + height - radius);
+            ctx.quadraticCurveTo(x + width, y + height, x + width - radius, y + height);
+            ctx.lineTo(x + radius, y + height);
+            ctx.quadraticCurveTo(x, y + height, x, y + height - radius);
+            ctx.lineTo(x, y + radius);
+            ctx.quadraticCurveTo(x, y, x + radius, y);
+            ctx.closePath();
+            ctx.fill();
+        }
+
+        function lerpColor(color1, color2, ratio) {
+            const hex = (c) => parseInt(c.slice(1), 16);
+            const r = (h) => (h >> 16) & 255;
+            const g = (h) => (h >> 8) & 255;
+            const b = (h) => h & 255;
+
+            const h1 = hex(color1);
+            const h2 = hex(color2);
+
+            const nr = Math.round(r(h1) + (r(h2) - r(h1)) * ratio);
+            const ng = Math.round(g(h1) + (g(h2) - g(h1)) * ratio);
+            const nb = Math.round(b(h1) + (b(h2) - b(h1)) * ratio);
+
+            return `rgb(${nr}, ${ng}, ${nb})`;
+        }
+
+        function applySkin(skinName) {
+            currentSkin = skinName;
+            document.body.style.backgroundColor = skins[skinName].bg;
+            localStorage.setItem('snakeSkin', skinName);
+
+            skinBtns.forEach(btn => {
+                btn.classList.toggle('active', btn.dataset.skin === skinName);
+            });
+
+            render();
+        }
+
+        function applyDifficulty(diffName) {
+            currentDifficulty = diffName;
+            localStorage.setItem('snakeDifficulty', diffName);
+            updateDifficultyBadge();
+
+            difficultyBtns.forEach(btn => {
+                btn.classList.toggle('active', btn.dataset.difficulty === diffName);
+            });
+
+            if (gameState === 'waiting') {
+                initGame();
+                render();
+            }
+        }
+
+        // ==================== 事件监听 ====================
+        document.addEventListener('keydown', (e) => {
+            const keyMap = {
+                'ArrowUp': 'up', 'KeyW': 'up',
+                'ArrowDown': 'down', 'KeyS': 'down',
+                'ArrowLeft': 'left', 'KeyA': 'left',
+                'ArrowRight': 'right', 'KeyD': 'right'
+            };
+
+            if (keyMap[e.code] && gameState === 'playing') {
+                const newDir = keyMap[e.code];
+                const opposites = { up: 'down', down: 'up', left: 'right', right: 'left' };
+
+                if (opposites[newDir] !== direction) {
+                    nextDirection = newDir;
+                }
+                e.preventDefault();
+            }
+
+            if (e.code === 'Space') {
+                e.preventDefault();
+                if (gameState === 'waiting' || gameState === 'over') {
+                    startGame();
+                } else {
+                    togglePause();
+                }
+            }
+
+            if (e.code === 'KeyR' && (gameState === 'over' || gameState === 'playing' || gameState === 'paused')) {
+                startGame();
+            }
+
+            if (e.code === 'KeyM') {
+                toggleMusic();
+            }
+        });
+
+        soundBtn.addEventListener('click', () => {
+            initAudio();
+            soundEnabled = !soundEnabled;
+            soundBtn.textContent = soundEnabled ? '🔊 音效' : '🔇 静音';
+            soundBtn.classList.toggle('active', soundEnabled);
+            localStorage.setItem('snakeSound', soundEnabled);
+        });
+
+        musicBtn.addEventListener('click', toggleMusic);
+
+        difficultyBtns.forEach(btn => {
+            btn.addEventListener('click', () => {
+                applyDifficulty(btn.dataset.difficulty);
+            });
+        });
+
+        skinBtns.forEach(btn => {
+            btn.addEventListener('click', () => {
+                applySkin(btn.dataset.skin);
+            });
+        });
+
+        // ==================== 初始化 ====================
+        function init() {
+            highScoreEl.textContent = highScore;
+            soundBtn.textContent = soundEnabled ? '🔊 音效' : '🔇 静音';
+            soundBtn.classList.toggle('active', soundEnabled);
+
+            applySkin(currentSkin);
+            applyDifficulty(currentDifficulty);
+
+            initGame();
+            render();
+        }
+
+        init();
+    </script>
+</body>
+</html>
