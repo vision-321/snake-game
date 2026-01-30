@@ -212,6 +212,68 @@
             font-size: 1.2rem;
         }
 
+        /* 角色选择 */
+        .character-select {
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+            flex-wrap: wrap;
+            margin: 15px 0;
+        }
+
+        .char-option {
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            border: 3px solid rgba(255, 255, 255, 0.3);
+            cursor: pointer;
+            transition: all 0.3s ease;
+            object-fit: cover;
+            opacity: 0.7;
+        }
+
+        .char-option:hover {
+            border-color: #FFD700;
+            opacity: 1;
+            transform: scale(1.1);
+        }
+
+        .char-option.selected {
+            border-color: #FFD700;
+            box-shadow: 0 0 20px rgba(255, 215, 0, 0.6);
+            opacity: 1;
+        }
+
+        /* 音乐可视化 */
+        .music-visualizer {
+            display: flex;
+            align-items: flex-end;
+            gap: 2px;
+            height: 16px;
+        }
+
+        .music-visualizer .bar {
+            width: 3px;
+            background: white;
+            border-radius: 1px;
+            animation: musicBar 0.4s ease-in-out infinite;
+        }
+
+        .music-visualizer .bar:nth-child(1) { animation-delay: 0s; }
+        .music-visualizer .bar:nth-child(2) { animation-delay: 0.1s; }
+        .music-visualizer .bar:nth-child(3) { animation-delay: 0.2s; }
+        .music-visualizer .bar:nth-child(4) { animation-delay: 0.15s; }
+
+        @keyframes musicBar {
+            0%, 100% { height: 4px; }
+            50% { height: 14px; }
+        }
+
+        .music-visualizer.paused .bar {
+            animation: none;
+            height: 4px;
+        }
+
         /* 底部控制区 */
         .bottom-controls {
             display: flex;
@@ -382,10 +444,13 @@
             <canvas id="gameCanvas" width="500" height="500"></canvas>
             <div class="overlay" id="startOverlay">
                 <h2>🐍 贪吃蛇 V3</h2>
-                <p>追逐战模式</p>
+                <p>追逐战模式 - 选择你的角色</p>
+                <div class="character-select" id="characterSelect">
+                    <!-- 动态生成 -->
+                </div>
                 <div class="rules-box">
                     <div class="rule"><span class="rule-icon">🟡</span> 你是进攻者，吃掉所有逃跑者</div>
-                    <div class="rule"><span class="rule-icon">🟢</span> 逃跑者会闪烁跳动，吃到得分</div>
+                    <div class="rule"><span class="rule-icon">🟢</span> 逃跑者会躲避你，吃到得分</div>
                     <div class="rule"><span class="rule-icon">🔴</span> 防守者是敌方蛇，碰到即死</div>
                     <div class="rule"><span class="rule-icon">⚠️</span> 防守者会随你成长而变大</div>
                 </div>
@@ -416,13 +481,21 @@
         <!-- 底部控制 -->
         <div class="bottom-controls">
             <button class="control-btn active" id="soundBtn">🔊 音效</button>
-            <button class="control-btn" id="reshuffleBtn">🔀 重新分组</button>
+            <button class="control-btn" id="musicBtn">
+                🍄 超级玛丽
+                <span class="music-visualizer paused" id="musicVisualizer">
+                    <span class="bar"></span>
+                    <span class="bar"></span>
+                    <span class="bar"></span>
+                    <span class="bar"></span>
+                </span>
+            </button>
         </div>
 
         <!-- 操作说明 -->
         <div class="instructions">
             <kbd>↑</kbd><kbd>↓</kbd><kbd>←</kbd><kbd>→</kbd> 移动 ｜
-            <kbd>空格</kbd> 开始/暂停 ｜ <kbd>R</kbd> 重新开始
+            <kbd>空格</kbd> 开始/暂停 ｜ <kbd>R</kbd> 重新开始 ｜ <kbd>M</kbd> 音乐
         </div>
 
         <!-- 虚拟方向键 -->
@@ -481,6 +554,10 @@
             defense: []        // 2人
         };
 
+        // 选中的角色
+        let selectedCharacter = localStorage.getItem('snakeV3Character') || 'rx';
+        let musicEnabled = false;
+
         // 预加载图片
         const characterImages = {};
         let imagesLoaded = 0;
@@ -518,7 +595,9 @@
         const winOverlay = document.getElementById('winOverlay');
         const groupsDisplay = document.getElementById('groupsDisplay');
         const soundBtn = document.getElementById('soundBtn');
-        const reshuffleBtn = document.getElementById('reshuffleBtn');
+        const musicBtn = document.getElementById('musicBtn');
+        const musicVisualizer = document.getElementById('musicVisualizer');
+        const characterSelect = document.getElementById('characterSelect');
 
         // ==================== 音效系统 ====================
         let audioCtx = null;
@@ -564,6 +643,158 @@
             setTimeout(() => playSound(1047, 0.3), 300);
         }
 
+        // ==================== 超级玛丽 BGM ====================
+        const marioMelody = [
+            // 主题开头
+            { note: 'E5', duration: 0.15 },
+            { note: 'E5', duration: 0.15 },
+            { note: null, duration: 0.15 },
+            { note: 'E5', duration: 0.15 },
+            { note: null, duration: 0.15 },
+            { note: 'C5', duration: 0.15 },
+            { note: 'E5', duration: 0.3 },
+            { note: 'G5', duration: 0.3 },
+            { note: null, duration: 0.3 },
+            { note: 'G4', duration: 0.3 },
+            { note: null, duration: 0.3 },
+            // 第二段
+            { note: 'C5', duration: 0.3 },
+            { note: null, duration: 0.15 },
+            { note: 'G4', duration: 0.3 },
+            { note: null, duration: 0.15 },
+            { note: 'E4', duration: 0.3 },
+            { note: null, duration: 0.15 },
+            { note: 'A4', duration: 0.2 },
+            { note: 'B4', duration: 0.2 },
+            { note: 'Bb4', duration: 0.15 },
+            { note: 'A4', duration: 0.2 },
+            // 快速音符
+            { note: 'G4', duration: 0.15 },
+            { note: 'E5', duration: 0.15 },
+            { note: 'G5', duration: 0.15 },
+            { note: 'A5', duration: 0.2 },
+            { note: 'F5', duration: 0.15 },
+            { note: 'G5', duration: 0.15 },
+            { note: null, duration: 0.15 },
+            { note: 'E5', duration: 0.2 },
+            { note: 'C5', duration: 0.15 },
+            { note: 'D5', duration: 0.15 },
+            { note: 'B4', duration: 0.2 },
+        ];
+
+        const marioBass = [
+            { note: 'D3', duration: 0.15 },
+            { note: 'D3', duration: 0.15 },
+            { note: null, duration: 0.15 },
+            { note: 'D3', duration: 0.15 },
+            { note: null, duration: 0.15 },
+            { note: 'D3', duration: 0.15 },
+            { note: 'D3', duration: 0.3 },
+            { note: 'G3', duration: 0.3 },
+            { note: null, duration: 0.3 },
+            { note: 'G2', duration: 0.3 },
+            { note: null, duration: 0.3 },
+            { note: 'G3', duration: 0.3 },
+            { note: null, duration: 0.15 },
+            { note: 'E3', duration: 0.3 },
+            { note: null, duration: 0.15 },
+            { note: 'C3', duration: 0.3 },
+        ];
+
+        const noteFrequencies = {
+            'G2': 98.00, 'A2': 110.00, 'C3': 130.81, 'D3': 146.83, 'E3': 164.81, 'G3': 196.00,
+            'E4': 329.63, 'G4': 392.00, 'A4': 440.00, 'Bb4': 466.16, 'B4': 493.88,
+            'C5': 523.25, 'D5': 587.33, 'E5': 659.25, 'F5': 698.46, 'G5': 783.99, 'A5': 880.00
+        };
+
+        let melodyIndex = 0;
+        let bassIndex = 0;
+        let melodyTimeout = null;
+        let bassTimeout = null;
+
+        function playNote(frequency, duration, type = 'square', volume = 0.1) {
+            if (!audioCtx || !musicEnabled) return;
+
+            const oscillator = audioCtx.createOscillator();
+            const gainNode = audioCtx.createGain();
+
+            oscillator.type = type;
+            oscillator.frequency.setValueAtTime(frequency, audioCtx.currentTime);
+
+            gainNode.gain.setValueAtTime(volume, audioCtx.currentTime);
+            gainNode.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + duration * 0.9);
+
+            oscillator.connect(gainNode);
+            gainNode.connect(audioCtx.destination);
+
+            oscillator.start(audioCtx.currentTime);
+            oscillator.stop(audioCtx.currentTime + duration);
+        }
+
+        function playMelody() {
+            if (!musicEnabled || gameState !== 'playing') return;
+
+            const note = marioMelody[melodyIndex];
+            if (note.note) {
+                const freq = noteFrequencies[note.note];
+                if (freq) {
+                    playNote(freq, note.duration, 'square', 0.08);
+                }
+            }
+
+            melodyIndex = (melodyIndex + 1) % marioMelody.length;
+            melodyTimeout = setTimeout(playMelody, note.duration * 1000);
+        }
+
+        function playBass() {
+            if (!musicEnabled || gameState !== 'playing') return;
+
+            const note = marioBass[bassIndex];
+            if (note.note) {
+                const freq = noteFrequencies[note.note];
+                if (freq) {
+                    playNote(freq, note.duration, 'triangle', 0.06);
+                }
+            }
+
+            bassIndex = (bassIndex + 1) % marioBass.length;
+            bassTimeout = setTimeout(playBass, note.duration * 1000);
+        }
+
+        function startBGM() {
+            if (!musicEnabled) return;
+            initAudio();
+
+            melodyIndex = 0;
+            bassIndex = 0;
+
+            playMelody();
+            playBass();
+
+            if (musicVisualizer) musicVisualizer.classList.remove('paused');
+        }
+
+        function stopBGM() {
+            clearTimeout(melodyTimeout);
+            clearTimeout(bassTimeout);
+            if (musicVisualizer) musicVisualizer.classList.add('paused');
+        }
+
+        function toggleMusic() {
+            initAudio();
+            musicEnabled = !musicEnabled;
+
+            if (musicEnabled) {
+                if (musicBtn) musicBtn.classList.add('active');
+                if (gameState === 'playing') {
+                    startBGM();
+                }
+            } else {
+                if (musicBtn) musicBtn.classList.remove('active');
+                stopBGM();
+            }
+        }
+
         // ==================== 分组逻辑 ====================
         function shuffleArray(array) {
             const arr = [...array];
@@ -575,13 +806,47 @@
         }
 
         function assignGroups() {
-            const shuffled = shuffleArray(allCharacters);
+            // 找到选中的角色
+            const attackChar = allCharacters.find(c => c.id === selectedCharacter) || allCharacters[0];
+
+            // 剩余角色随机分组
+            const remaining = shuffleArray(allCharacters.filter(c => c.id !== selectedCharacter));
+
             groups = {
-                attack: shuffled[0],
-                escape: shuffled.slice(1, 4),
-                defense: shuffled.slice(4, 6)
+                attack: attackChar,
+                escape: remaining.slice(0, 3),   // 前3个作为逃跑组
+                defense: remaining.slice(3, 5)   // 后2个作为防守组
             };
             updateGroupsDisplay();
+        }
+
+        function initCharacterSelect() {
+            characterSelect.innerHTML = allCharacters.map(char => `
+                <img class="char-option ${char.id === selectedCharacter ? 'selected' : ''}"
+                     src="${char.image}"
+                     alt="${char.name}"
+                     title="${char.name}"
+                     data-id="${char.id}">
+            `).join('');
+
+            // 添加点击事件
+            characterSelect.querySelectorAll('.char-option').forEach(img => {
+                img.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    selectedCharacter = img.dataset.id;
+                    localStorage.setItem('snakeV3Character', selectedCharacter);
+
+                    // 更新UI
+                    characterSelect.querySelectorAll('.char-option').forEach(i => {
+                        i.classList.toggle('selected', i.dataset.id === selectedCharacter);
+                    });
+
+                    // 重新分组
+                    assignGroups();
+                    initGame();
+                    render();
+                });
+            });
         }
 
         function updateGroupsDisplay() {
@@ -864,6 +1129,7 @@
         function gameOver(reason) {
             gameState = 'over';
             clearAllTimers();
+            stopBGM();
             gameOverReasonEl.textContent = reason;
             finalScoreEl.textContent = score;
             gameOverOverlay.classList.remove('hidden');
@@ -873,6 +1139,7 @@
         function win() {
             gameState = 'win';
             clearAllTimers();
+            stopBGM();
             winScoreEl.textContent = score;
             winOverlay.classList.remove('hidden');
             playWinSound();
@@ -888,6 +1155,9 @@
             pauseOverlay.classList.add('hidden');
 
             startTimers();
+            if (musicEnabled) {
+                startBGM();
+            }
             runGameLoop();
         }
 
@@ -895,23 +1165,27 @@
             if (gameState === 'playing') {
                 gameState = 'paused';
                 clearAllTimers();
+                stopBGM();
                 pauseOverlay.classList.remove('hidden');
             } else if (gameState === 'paused') {
                 gameState = 'playing';
                 pauseOverlay.classList.add('hidden');
                 startTimers();
+                if (musicEnabled) {
+                    startBGM();
+                }
                 runGameLoop();
             }
         }
 
         function startTimers() {
-            // 逃跑者移动计时器
-            escapeTimer = setInterval(moveEscapeTargets, 600);
+            // 逃跑者移动计时器（加快移动速度）
+            escapeTimer = setInterval(moveEscapeTargets, 400);
 
             // 防守者移动计时器
             defenseTimer = setInterval(moveDefenseSnakes, 300);
 
-            // 闪烁计时器
+            // 闪烁计时器（只用于防守蛇）
             blinkTimer = setInterval(() => {
                 blinkState = !blinkState;
             }, 200);
@@ -953,18 +1227,16 @@
                 ctx.stroke();
             }
 
-            // 绘制逃跑者（绿色光晕，闪烁）
+            // 绘制逃跑者（固定绿色光晕，不闪烁）
             escapeTargets.forEach(target => {
-                const alpha = blinkState ? 1 : 0.5;
                 const img = characterImages[target.character.id];
 
                 if (img && img.complete) {
                     ctx.save();
-                    ctx.globalAlpha = alpha;
 
-                    // 绿色光晕
+                    // 固定绿色光晕
                     ctx.shadowColor = '#00FF00';
-                    ctx.shadowBlur = blinkState ? 25 : 15;
+                    ctx.shadowBlur = 15;
 
                     ctx.beginPath();
                     ctx.arc(
@@ -985,10 +1257,9 @@
                     );
                     ctx.restore();
 
-                    // 绿色边框
+                    // 固定绿色边框
                     ctx.strokeStyle = '#00FF00';
                     ctx.lineWidth = 3;
-                    ctx.globalAlpha = alpha;
                     ctx.beginPath();
                     ctx.arc(
                         target.x * GRID_SIZE + GRID_SIZE / 2,
@@ -997,7 +1268,6 @@
                         0, Math.PI * 2
                     );
                     ctx.stroke();
-                    ctx.globalAlpha = 1;
                 }
             });
 
@@ -1306,12 +1576,13 @@
             localStorage.setItem('snakeV3Sound', soundEnabled);
         });
 
-        // 重新分组
-        reshuffleBtn.addEventListener('click', () => {
-            if (gameState === 'waiting') {
-                assignGroups();
-                initGame();
-                render();
+        // 音乐开关
+        musicBtn.addEventListener('click', toggleMusic);
+
+        // M键切换音乐
+        document.addEventListener('keydown', (e) => {
+            if (e.code === 'KeyM') {
+                toggleMusic();
             }
         });
 
@@ -1321,6 +1592,7 @@
             soundBtn.textContent = soundEnabled ? '🔊 音效' : '🔇 静音';
             soundBtn.classList.toggle('active', soundEnabled);
 
+            initCharacterSelect();
             assignGroups();
             preloadImages();
             initGame();
